@@ -4,8 +4,9 @@ from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTa
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import make_job_dir, generate_pages, make_pdf, logger, config, ComicRequest
+from app import make_job_dir, generate_pages, make_pdf, logger, config, ComicRequest, StoryIdeasRequest, StoryIdeasResponse, story_ideas, generate_comic_cover
 
+api_prefix = "/api/v1"
 log = logger.get_logger(__name__)
 app = FastAPI()
 app.add_middleware(
@@ -16,7 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/generate")
+@app.post(api_prefix+"/generate/comic/pages")
 async def generate_comic(
     background_tasks: BackgroundTasks,
     payload: str = Form(...),            # JSON string for ComicRequest
@@ -82,3 +83,51 @@ REFERENCE: Match main character’s face to: {req.image_ref}"""
     zip_base = os.path.join(workdir, "pages")
     shutil.make_archive(zip_base, "zip", workdir)
     return FileResponse(f"{zip_base}.zip", media_type="application/zip", filename="comic_pages.zip")
+
+
+@app.post(api_prefix+"/generate/story-ideas", response_model=StoryIdeasResponse)
+async def story_ideas_endpoint(req: StoryIdeasRequest) -> StoryIdeasResponse:
+    return await story_ideas(req)
+
+@app.post(api_prefix+"/generate/comic-cover")
+async def generate_comic_cover_endpoint(
+    background_tasks: BackgroundTasks,
+    payload: str = Form(...),            # JSON with {cover_art_description, user_theme}
+    image: UploadFile = File(None),      # optional resemblance image
+):
+    # Make job dir; auto-clean unless KEEP_OUTPUTS=true
+    workdir = make_job_dir()
+    if not config.keep_outputs:
+        background_tasks.add_task(shutil.rmtree, str(workdir), ignore_errors=True)
+
+    # Parse payload
+    try:
+        data = json.loads(payload)
+        cover_art_description = data["cover_art_description"]
+        user_theme = data["user_theme"]
+    except Exception as e:
+        raise HTTPException(422, f"Invalid payload JSON: {e}")
+
+    # Optional image save
+    ref_path = None
+    if image:
+        if image.content_type not in {"image/png", "image/jpeg"}:
+            raise HTTPException(400, "image must be PNG or JPEG")
+        ref_path = os.path.join(workdir, "cover_ref.png")
+        with open(ref_path, "wb") as f:
+            f.write(await image.read())
+
+    # Generate cover
+    out_path = os.path.join(workdir, "cover.png")
+    try:
+        generate_comic_cover(
+            cover_art_description=cover_art_description,
+            user_theme=user_theme,
+            output_path=out_path,
+            image_ref_path=ref_path,
+        )
+    except Exception as e:
+        log.exception("Cover generation failed")
+        raise HTTPException(500, f"Cover generation failed: {e}")
+
+    return FileResponse(out_path, media_type="image/png", filename="comic_cover.png")

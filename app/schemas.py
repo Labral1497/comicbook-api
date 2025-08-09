@@ -24,3 +24,22 @@ class ComicRequest(BaseModel):
     return_pdf: bool = False
     # Optional: allow a previously uploaded image reference URL/path
     image_ref: Optional[str] = None
+
+class StoryIdeasRequest(BaseModel):
+    name: str = Field(..., description="Main character name")
+    theme: str
+    job: str
+    dream: str
+    origin: str
+    hobby: str
+    catchphrase: str
+    super_skill: str
+    favorite_place: str
+    taste_in_women: str
+
+class StoryIdea(BaseModel):
+    title: str
+    synopsis: str
+
+class StoryIdeasResponse(BaseModel):
+    ideas: List[StoryIdea]
