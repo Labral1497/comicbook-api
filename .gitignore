@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+.envrc
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Builds/outputs
+output/
+dist/
+build/
+*.pdf
+*.png
+*.zip
+
+# Runtime
+*.log
