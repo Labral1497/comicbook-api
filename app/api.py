@@ -1,12 +1,12 @@
 # api.py
-import os, uuid, json, shutil, tempfile
-from typing import List
+import os, uuid, json, shutil
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from main import generate_pages, make_pdf
+from app import make_job_dir, generate_pages, make_pdf, logger, config
 
+log = logger.get_logger(__name__)
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -26,18 +26,23 @@ async def generate_comic(
     image: UploadFile = File(None),         # optional image file
     return_pdf: bool = Form(False),
 ):
-    workdir = tempfile.mkdtemp(prefix="job_")
+    workdir = make_job_dir()
+    log.info(f"Working directory created: {workdir}")
     # auto-clean temp directory after response is sent
-    background_tasks.add_task(shutil.rmtree, workdir, ignore_errors=True)
+    if not config.keep_outputs:
+        background_tasks.add_task(shutil.rmtree, workdir, ignore_errors=True)
 
     ref_path = None
     if image:
         if image.content_type not in {"image/png", "image/jpeg"}:
+            log.error("Invalid image format")
             raise HTTPException(400, "image must be PNG or JPEG")
         ref_path = os.path.join(workdir, "ref.png")
         with open(ref_path, "wb") as f:
             f.write(await image.read())
+        log.info(f"Reference image saved at: {ref_path}")
 
+    log.info(f"Pages JSON received: {pages}")
     try:
         page_list = json.loads(pages)
         assert isinstance(page_list, list)
@@ -65,9 +70,9 @@ REFERENCE: Match main character’s face to the uploaded image at {ref_path}"""
         prepared_prompts.append(prompt)
 
     files = generate_pages(
-    prepared_prompts,
-    max_workers=4,
-    output_prefix=os.path.join(workdir, "page")  # <-- use output_prefix
+        prepared_prompts,
+        max_workers=4,
+        output_prefix=os.path.join(workdir, "page")  # <-- use output_prefix
     )
     if not files:
         raise HTTPException(500, "no pages were generated")

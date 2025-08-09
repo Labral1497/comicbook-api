@@ -1,5 +1,4 @@
 # main.py
-import os
 import time
 import base64
 import concurrent.futures
@@ -9,16 +8,10 @@ from openai import OpenAI
 from PIL import Image
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
+from app import logger, config
 
-# ------------------------
-# CONFIG
-# ------------------------
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-# Valid for gpt-image-1: "1024x1024", "1024x1536", "1536x1024", or "auto"
-DEFAULT_SIZE = os.getenv("IMAGE_SIZE", "1024x1536")
-DEFAULT_MODEL = os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1")
-
-_client = OpenAI(api_key=OPENAI_API_KEY)
+log = logger.get_logger(__name__)
+_client = OpenAI(api_key=config.openai_api_key)
 
 # ------------------------
 # IMAGE GENERATION (single)
@@ -28,8 +21,8 @@ def generate_page(
     prompt: str,
     *,
     output_filename_prefix: str,
-    model: str = DEFAULT_MODEL,
-    size: str = DEFAULT_SIZE,
+    model: Optional[str] = None,
+    size: Optional[str] = None,
     retries: int = 3,
     delay: float = 5.0,
 ) -> Optional[str]:
@@ -37,7 +30,8 @@ def generate_page(
     Generate one image for a page using a fully-formed prompt string.
     Returns the saved filename, or None on failure.
     """
-    print(OPENAI_API_KEY)
+    model = model or config.openai_image_model
+    size = size or config.image_size
     for attempt in range(1, retries + 1):
         try:
             resp = _client.images.generate(
@@ -47,7 +41,9 @@ def generate_page(
                 n=1,
             )
             b64 = resp.data[0].b64_json
+            log.info(f"Generating page {page_idx + 1} with prompt length {len(prompt)} chars")
             filename = f"{output_filename_prefix}-{page_idx + 1}.png"
+            log.info(f"Saving page {page_idx + 1} to: {filename}")
             with open(filename, "wb") as f:
                 f.write(base64.b64decode(b64))
             print(f"✅ Saved {filename}")
@@ -68,14 +64,16 @@ def generate_pages(
     *,
     max_workers: int = 1,
     output_prefix: str = "page",
-    model: str = DEFAULT_MODEL,
-    size: str = DEFAULT_SIZE,
+    model: Optional[str] = None,
+    size: Optional[str] = None,
 ) -> List[str]:
     """
     Generate many images in parallel from a list of fully-formed prompts.
     Returns a list of successfully created filenames in original order (failed pages omitted).
     """
     results: List[Optional[str]] = [None] * len(prompts)
+    model = model or config.openai_image_model
+    size = size or config.image_size
 
     def _worker(i: int, p: str) -> Optional[str]:
         return generate_page(
@@ -107,6 +105,7 @@ def make_pdf(files: List[str], pdf_name: str = "comic.pdf") -> str:
     """
     Combine images into a single A4 PDF—one image per page, centered and scaled.
     """
+    log.info(f"Combining {len(files)} pages into PDF: {pdf_name}")
     c = canvas.Canvas(pdf_name, pagesize=A4)
     w, h = A4
     for file in files:
