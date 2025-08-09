@@ -19,7 +19,7 @@ def _fake_png_b64(w=64, h=64):
 
 class FakeOpenAIImagesGenerateResponse:
     def __init__(self, b64):
-        class _D:  # minimal shape: resp.data[0].b64_json
+        class _D:
             def __init__(self, b):
                 self.b64_json = b
         self.data = [_D(b64)]
@@ -80,21 +80,17 @@ def test_generate_pages_creates_multiple_files(tmp_path, fake_client):
 
 
 def test_make_pdf_builds_pdf(tmp_path, fake_client):
-    # first create two images
     prompts = ["p1", "p2"]
     out_prefix = tmp_path / "page"
     files = main.generate_pages(prompts, output_prefix=str(out_prefix))
-    # now build PDF
     pdf_path = tmp_path / "out.pdf"
     got = main.make_pdf(files, pdf_name=str(pdf_path))
     assert got == str(pdf_path)
     assert pdf_path.exists()
-    # sanity: file not empty
     assert pdf_path.stat().st_size > 0
 
 
 def test_generate_page_retries_and_returns_none_on_failure(monkeypatch, tmp_path):
-    # make client raise Exception every time
     class FailingImages:
         def generate(self, **kwargs):
             raise RuntimeError("boom")

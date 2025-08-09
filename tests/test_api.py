@@ -1,20 +1,19 @@
 # tests/test_api.py
 import json
-from pathlib import Path
 from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.api import app  # your FastAPI app module
+from app.api import app
 import app.main as main
 
 
 @pytest.fixture
 def client(monkeypatch):
     # Patch OpenAI client to avoid real calls
-    from test_main import FakeOpenAIClient, _fake_png_b64
+    from tests.test_main import FakeOpenAIClient, _fake_png_b64
     monkeypatch.setattr(main, "_client", FakeOpenAIClient(_fake_png_b64()))
     return TestClient(app)
 
@@ -27,41 +26,43 @@ def _tiny_png_bytes():
     return buf.getvalue()
 
 
-def test_generate_pdf_without_image(client, tmp_path, monkeypatch):
-    # Ensure BASE_OUTPUT_DIR goes into tmp_path for the test
-    monkeypatch.setenv("PYTHONPATH", str(tmp_path))
-    pages = [
-        {"id": 1, "title": "T1", "panels": ["A", "B", "C", "D"]},
-        {"id": 2, "title": "T2", "panels": ["E", "F", "G", "H"]},
-    ]
-    data = {
+def test_generate_pdf_without_image(client):
+    payload = {
         "comic_title": "$uper-Cringe",
         "style": "test-style",
         "character": "test-character",
-        "pages": json.dumps(pages),
-        "return_pdf": "true",
+        "pages": [
+            {"id": 1, "title": "T1", "panels": ["A", "B", "C", "D"]},
+            {"id": 2, "title": "T2", "panels": ["E", "F", "G", "H"]},
+        ],
+        "return_pdf": True,
     }
-    resp = client.post("/generate", data=data)
+    # Send as multipart with a single 'payload' string field
+    resp = client.post(
+        "/generate",
+        data={"payload": json.dumps(payload)},  # Form(...) expects a string
+    )
     assert resp.status_code == 200
-    # returned a PDF file
-    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.headers["content-type"].startswith("application/pdf")
 
 
 def test_generate_zip_with_image(client):
-    pages = [
-        {"id": 1, "title": "T1", "panels": ["A", "B", "C", "D"]},
-    ]
-    files = {
-        "image": ("ref.png", _tiny_png_bytes(), "image/png"),
-    }
-    data = {
+    payload = {
         "comic_title": "Demo",
         "style": "s",
         "character": "c",
-        "pages": json.dumps(pages),
-        "return_pdf": "false",
+        "pages": [
+            {"id": 1, "title": "T1", "panels": ["A", "B", "C", "D"]},
+        ],
+        "return_pdf": False,
     }
-    resp = client.post("/generate", data=data, files=files)
+    files = {
+        "image": ("ref.png", _tiny_png_bytes(), "image/png"),
+    }
+    resp = client.post(
+        "/generate",
+        data={"payload": json.dumps(payload)},
+        files=files,
+    )
     assert resp.status_code == 200
-    # returned a zip
-    assert resp.headers["content-type"] == "application/zip"
+    assert resp.headers["content-type"].startswith("application/zip")
