@@ -1,0 +1,7 @@
+# server.py (repo root)
+from app.api import app  # <-- import your FastAPI instance from app/api.py
+
+# Optional local run:
+if __name__ == "__main__":
+    import os, uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))

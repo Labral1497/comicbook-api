@@ -1,0 +1,28 @@
+{
+  "comic_title": "$uper-Cringe",
+  "style": "1980s Japanese anime print; 4-panel page grid; thick ink lines; halftone + newsprint texture; muted CMYK palette; dramatic speed lines; exaggerated facial expressions; hand-lettered SFX; clean gutters; A4 portrait (1536x1024).",
+  "character": "Yaron Shamai — curly dark hair, short beard, mischievous grin.",
+  "pages": [
+    {
+      "id": 1,
+      "title": "Audit of Awkwardness",
+      "panels": [
+        "Wide boardroom. Caption: 'Quarterly Cringe Review.' Yaron scans the table, unimpressed.",
+        "Close-up: red pen circling a disastrous campaign slide titled 'Relatable CEO'.",
+        "Executives lean in, sweating. Bubble (Exec): 'Is any of this… salvageable?'",
+        "Yaron taps the slide. Bubble: 'With precision shame? Always.'"
+      ]
+    },
+    {
+      "id": 2,
+      "title": "the sad truth",
+      "panels": [
+        "Wide boardroom. Caption: 'Quarterly Cringe Review.' Yaron scans the table, unimpressed.",
+        "Close-up: red pen circling a disastrous campaign slide titled 'Relatable CEO'.",
+        "Executives lean in, sweating. Bubble (Exec): 'Is any of this… salvageable?'",
+        "Yaron taps the slide. Bubble: 'With precision shame? Always.'"
+      ]
+    }
+  ],
+  "return_pdf": true
+}
