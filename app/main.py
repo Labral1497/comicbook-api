@@ -5,7 +5,7 @@ import json
 import os
 import time
 from typing import List, Optional
-
+from pydantic import ValidationError
 
 from openai import OpenAI
 from PIL import Image
@@ -13,11 +13,20 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from app.config import config
 from app import logger
-from app.schemas import StoryIdeasRequest, StoryIdeasResponse, StoryIdea
+from app.schemas import (
+    StoryIdeasRequest,
+    StoryIdeasResponse,
+    StoryIdea,
+    FullScriptRequest,
+    FullScriptResponse,
+    ScriptPage,
+    ScriptPanel
+)
 
 log = logger.get_logger(__name__)
 _client = OpenAI(api_key=config.openai_api_key)
 _text_client = OpenAI(api_key=config.openai_api_key)
+_TEXT_MODEL = os.getenv("OPENAI_TEXT_MODEL", getattr(config, "openai_text_model", "gpt-4o-mini"))
 
 # ------------------------
 # IMAGE GENERATION (single)
@@ -40,6 +49,7 @@ def generate_page(
     size = size or config.image_size
     for attempt in range(1, retries + 1):
         try:
+            log.info(f"prompt is {prompt}")
             resp = _client.images.generate(
                 model="gpt-image-1",
                 prompt=prompt,
@@ -163,7 +173,7 @@ async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
 
     try:
         resp = _text_client.chat.completions.create(
-            model=os.getenv("OPENAI_TEXT_MODEL", getattr(config, "openai_text_model", "gpt-4o-mini")),
+            model=_TEXT_MODEL,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_prompt},
@@ -239,6 +249,7 @@ Create a vibrant, ultra-high-resolution comic book cover. The artwork should be 
 """.strip()
 
     log.info("Generating comic cover...")
+    log.info(f"prompt is: {prompt}")
     resp = _client.images.generate(model=model, prompt=prompt, size=size, n=1)
     b64 = resp.data[0].b64_json
 
@@ -248,6 +259,150 @@ Create a vibrant, ultra-high-resolution comic book cover. The artwork should be 
 
     log.info(f"✅ Cover saved to {output_path}")
     return output_path
+
+def build_full_script_prompt(req: FullScriptRequest) -> str:
+    traits = ", ".join(req.user_answers_list) if req.user_answers_list else ""
+    return f"""
+You are an elite-level comic book writer and storyboard artist, a creative fusion of a master storyteller known for wit and charm, and a film director known for brilliant visual comedy. Your task is to write a complete, hilarious, and visually rich comic book script from start to finish, formatted as a single, clean JSON object.
+
+CONTEXT & INPUTS:
+* Story Synopsis to Adapt: "{req.chosen_story_idea}"
+* Main Character Name: "{req.user_name}"
+* Main Character Gender: "{req.user_gender}"
+* Definitive Character Description (for illustration consistency): "{req.character_description}"
+* Total Page Count: "{req.page_count}"
+* Core Theme: "{req.user_theme}"
+* Character's Comedic Traits (Source material for jokes, use them creatively): "{traits}"
+* Panels per page must be between {req.min_panels_per_page} and {req.max_panels_per_page} (inclusive).
+🔹 * For EACH page, CHOOSE a panel count **randomly within that range**, and **vary** counts across pages; do **not** use the same number on every page unless it serves a clear comedic or narrative purpose.
+
+PRIMARY DIRECTIVE:
+Generate a complete comic book script that adapts the provided synopsis into a brilliant and funny narrative. The script must be returned as a single JSON object, adhering strictly to the schema and mandates below. Use exactly {req.page_count} pages. Number panels 1..N on each page.
+
+JSON SCHEMA (Your entire output MUST be a single JSON object that follows this exact structure):
+{{
+  "title": "A Catchy and Funny Title for the Comic",
+  "tagline": "A Hilarious Subtitle or Punchy Quote",
+  "cover_art_description": "A highly detailed description of a dynamic and exciting cover image. Describe the character's pose, expression, the background, the mood, and the central action. This should be like a 'movie poster' for the story.",
+  "pages": [
+    {{
+      "page_number": 1,
+      "panels": [
+        {{
+          "panel_number": 1,
+          "art_description": "EXTREMELY detailed visual description. Describe camera angle (e.g., 'Wide shot', 'Close-up on face'), character's action, specific expression, background elements, and lighting. Be the eyes for the illustrator AI.",
+          "dialogue": "Character Name: 'The dialogue for this panel.' or '' if there is no dialogue.",
+          "narration": "A narration box text, like a storyteller's voice. or '' if there is none.",
+          "sfx": "Sound effects like 'CRASH!', 'BEEP!', or 'THWUMP!'. Leave as '' if there are none."
+        }}
+      ]
+    }}
+  ]
+}}
+
+Output ONLY the JSON object. Do not wrap in markdown fences. Do not add commentary.
+""".strip()
+
+def _full_script_json_schema() -> dict:
+    # JSON Schema that matches FullScriptResponse exactly
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "title": {"type": "string"},
+            "tagline": {"type": "string"},
+            "cover_art_description": {"type": "string"},
+            "pages": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "page_number": {"type": "integer"},
+                        "panels": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "panel_number": {"type": "integer"},
+                                    "art_description": {"type": "string"},
+                                    "dialogue": {"type": "string"},
+                                    "narration": {"type": "string"},
+                                    "sfx": {"type": "string"}
+                                },
+                                "required": [
+                                    "panel_number",
+                                    "art_description",
+                                    "dialogue",
+                                    "narration",
+                                    "sfx"
+                                ]
+                            }
+                        }
+                    },
+                    "required": ["page_number", "panels"]
+                }
+            }
+        },
+        "required": ["title", "tagline", "cover_art_description", "pages"]
+    }
+
+async def call_llm_return_json_string(prompt: str) -> str:
+    """
+    Calls GPT and returns the *raw JSON string* for FullScriptResponse.
+    Uses Structured Outputs with a JSON Schema to guarantee shape.
+    """
+    # system primer keeps the model terse and JSON-only
+    system_msg = (
+        "You are an elite-level comic writer & storyboard artist. "
+        "Return ONLY a single JSON object that strictly conforms to the provided JSON Schema. "
+        "Do not add commentary or markdown fences."
+    )
+
+    resp = _text_client.chat.completions.create(
+        model=_TEXT_MODEL,
+        temperature=0.2,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "FullScriptResponse",
+                "schema": _full_script_json_schema(),
+            },
+        },
+        messages=[
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    content = resp.choices[0].message.content or ""
+    return content.strip()
+
+def _extract_json_str(raw: str) -> str:
+    raw = raw.strip()
+    if raw.startswith("{") and raw.endswith("}"):
+        return raw
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return raw[start:end+1]
+    return raw  # let validation fail later
+
+async def generate_full_script(req: FullScriptRequest) -> FullScriptResponse:
+    prompt = build_full_script_prompt(req)
+    raw = await call_llm_return_json_string(prompt)
+    cleaned = _extract_json_str(raw)
+    try:
+        # pydantic v2
+        return FullScriptResponse.model_validate_json(cleaned)
+    except AttributeError:
+        # pydantic v1 fallback
+        from pydantic import parse_raw_as
+        return parse_raw_as(FullScriptResponse, cleaned)
+    except ValidationError as ve:
+        raise ve
+
 
 # ------------------------
 # CLI self-test (does nothing on import by FastAPI)

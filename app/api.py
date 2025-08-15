@@ -3,9 +3,23 @@ import os, uuid, json, shutil
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 
-from app import make_job_dir, generate_pages, make_pdf, logger, config, ComicRequest, StoryIdeasRequest, StoryIdeasResponse, story_ideas, generate_comic_cover
-
+from app import (
+    make_job_dir,
+    generate_pages,
+    make_pdf,
+    logger,
+    config,
+    ComicRequest,
+    StoryIdeasRequest,
+    StoryIdeasResponse,
+    story_ideas,
+    generate_comic_cover,
+    FullScriptResponse,
+    FullScriptRequest,
+    generate_full_script,
+)
 api_prefix = "/api/v1"
 log = logger.get_logger(__name__)
 app = FastAPI()
@@ -85,16 +99,17 @@ REFERENCE: Match main character’s face to: {req.image_ref}"""
     return FileResponse(f"{zip_base}.zip", media_type="application/zip", filename="comic_pages.zip")
 
 
-@app.post(api_prefix+"/generate/story-ideas", response_model=StoryIdeasResponse)
+@app.post(api_prefix+"/generate/comic/ideas", response_model=StoryIdeasResponse)
 async def story_ideas_endpoint(req: StoryIdeasRequest) -> StoryIdeasResponse:
     return await story_ideas(req)
 
-@app.post(api_prefix+"/generate/comic-cover")
+@app.post(api_prefix+"/generate/comic/cover")
 async def generate_comic_cover_endpoint(
     background_tasks: BackgroundTasks,
     payload: str = Form(...),            # JSON with {cover_art_description, user_theme}
     image: UploadFile = File(None),      # optional resemblance image
 ):
+    print("yoyo")
     # Make job dir; auto-clean unless KEEP_OUTPUTS=true
     workdir = make_job_dir()
     if not config.keep_outputs:
@@ -131,3 +146,12 @@ async def generate_comic_cover_endpoint(
         raise HTTPException(500, f"Cover generation failed: {e}")
 
     return FileResponse(out_path, media_type="image/png", filename="comic_cover.png")
+
+@app.post(api_prefix+"/generate/comic/script", response_model=FullScriptResponse)
+async def generate_full_script_endpoint(req: FullScriptRequest) -> FullScriptResponse:
+    try:
+        return await generate_full_script(req)
+    except ValidationError as ve:
+        raise HTTPException(status_code=422, detail=f"Schema validation failed: {ve.errors()}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Full script generation failed: {e}")

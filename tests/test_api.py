@@ -122,7 +122,7 @@ def test_story_ideas_success(client, monkeypatch):
         "favorite_place": "Dubai",
         "taste_in_women": "Blonde in bikini"
     }
-    resp = client.post("/api/v1/generate/story-ideas", json=payload)
+    resp = client.post("/api/v1/generate/comic/ideas", json=payload)
     assert resp.status_code == 200
     data = resp.json()
     assert "ideas" in data
@@ -146,7 +146,7 @@ def test_story_ideas_malformed_model_output_returns_empty_list(client, monkeypat
         "favorite_place": "Dubai",
         "taste_in_women": "Blonde in bikini"
     }
-    resp = client.post("/api/v1/generate/story-ideas", json=payload)
+    resp = client.post("/api/v1/generate/comic/ideas", json=payload)
     assert resp.status_code == 200
     data = resp.json()
     assert "ideas" in data
@@ -168,7 +168,7 @@ def test_generate_comic_cover_without_image(client):
         "user_theme": "Synthwave Superhero"
     }
     resp = client.post(
-        "/api/v1/generate/comic-cover",
+        "/api/v1/generate/comic/cover",
         data={"payload": json.dumps(payload)},
     )
     assert resp.status_code == 200
@@ -185,9 +185,91 @@ def test_generate_comic_cover_with_image(client):
     buf = BytesIO(); img.save(buf, format="PNG"); buf.seek(0)
 
     resp = client.post(
-        "/api/v1/generate/comic-cover",
+        "/api/v1/generate/comic/cover",
         data={"payload": json.dumps(payload)},
         files={"image": ("ref.png", buf.getvalue(), "image/png")},
     )
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/png")
+
+# --------------------
+# /generate/full-script tests
+# --------------------
+
+def _full_script_ok_json():
+    return json.dumps({
+        "title": "Good Title",
+        "tagline": "Good Tagline",
+        "cover_art_description": "Poster-like cover with cinematic lighting and bold colors.",
+        "pages": [
+            {
+                "page_number": 1,
+                "panels": [
+                    {
+                        "panel_number": 1,
+                        "art_description": "Wide shot of city; hero enters; dynamic pose.",
+                        "dialogue": "Roey: 'Alright, let's do this!'",
+                        "narration": "",
+                        "sfx": "SWISH!"
+                    }
+                ]
+            }
+        ]
+    }, ensure_ascii=False)
+
+def _full_script_bad_schema_json():
+    # Missing required fields and wrong types -> should fail schema validation
+    return json.dumps({
+        "tagline": "Oops",
+        "cover_art_description": 123,   # wrong type
+        "pages": "not-a-list"          # wrong type
+    }, ensure_ascii=False)
+
+async def _mock_full_script_llm_ok(_prompt: str) -> str:
+    return _full_script_ok_json()
+
+async def _mock_full_script_llm_bad(_prompt: str) -> str:
+    return _full_script_bad_schema_json()
+
+def _full_script_payload():
+    return {
+        "chosen_story_idea": "Founder tries to launch an AI comics platform, chaos ensues.",
+        "user_name": "Roey",
+        "user_gender": "Male",
+        "character_description": "30s, techwear hoodie, expressive eyebrows, short dark hair.",
+        "page_count": 3,
+        "user_theme": "Tech entrepreneur comedy",
+        "user_answers_list": ["self-deprecating humor", "debugging mishaps"]
+    }
+
+def test_full_script_success(client, monkeypatch):
+    # Patch LLM call inside app.main
+    monkeypatch.setattr(main, "call_llm_return_json_string", _mock_full_script_llm_ok)
+
+    resp = client.post("/api/v1/generate/comic/script", json=_full_script_payload())
+    assert resp.status_code == 200, resp.text
+
+    data = resp.json()
+    assert set(data.keys()) == {"title", "tagline", "cover_art_description", "pages"}
+    assert isinstance(data["pages"], list) and len(data["pages"]) >= 1
+    assert data["pages"][0]["page_number"] == 1
+    assert isinstance(data["pages"][0]["panels"], list) and len(data["pages"][0]["panels"]) >= 1
+    assert data["pages"][0]["panels"][0]["panel_number"] == 1
+    assert "art_description" in data["pages"][0]["panels"][0]
+
+def test_full_script_schema_error_from_llm(client, monkeypatch):
+    # Return malformed JSON (schema-wise) to trigger 422 from API
+    monkeypatch.setattr(main, "call_llm_return_json_string", _mock_full_script_llm_bad)
+
+    resp = client.post("/api/v1/generate/comic/script", json=_full_script_payload())
+    assert resp.status_code == 422
+    detail = resp.json().get("detail", "")
+    # Your API raises HTTPException(422, f"Schema validation failed: {ve.errors()}")
+    assert "Schema validation failed" in str(detail)
+
+def test_full_script_invalid_request_body(client):
+    # page_count <= 0 -> request validation should fail before hitting the LLM
+    bad = _full_script_payload()
+    bad["page_count"] = 0
+    resp = client.post("/api/v1/generate/comic/script", json=bad)
+    assert resp.status_code == 422

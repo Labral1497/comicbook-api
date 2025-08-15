@@ -1,6 +1,6 @@
 # app/schemas.py
 from typing import List, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 class Page(BaseModel):
     id: int = Field(..., ge=1)
@@ -43,3 +43,50 @@ class StoryIdea(BaseModel):
 
 class StoryIdeasResponse(BaseModel):
     ideas: List[StoryIdea]
+
+class FullScriptRequest(BaseModel):
+    chosen_story_idea: str = Field(..., description="Story Synopsis to Adapt")
+    user_name: str = Field(..., description="Main Character Name")
+    user_gender: str = Field(..., description="Main Character Gender")
+    character_description: str = Field(..., description="Definitive Character Description for illustration consistency")
+    page_count: int = Field(..., gt=0, description="Total Page Count")
+    user_theme: str = Field(..., description="Core Theme")
+    user_answers_list: List[str] = Field(default_factory=list, description="Comedic traits / joke sources")
+
+    # NEW: user-provided panel bounds
+    min_panels_per_page: int = Field(4, ge=1, description="Minimum panels per page")
+    max_panels_per_page: int = Field(4, ge=1, description="Maximum panels per page")
+
+    @model_validator(mode="after")
+    def _check_panel_bounds(self):
+        if self.max_panels_per_page < self.min_panels_per_page:
+            raise ValueError("max_panels_per_page must be >= min_panels_per_page")
+        # (Optional) put a soft upper limit if you want, e.g. <= 12
+        return self
+
+class ScriptPanel(BaseModel):
+    panel_number: int
+    art_description: str
+    dialogue: str
+    narration: str
+    sfx: str
+
+class ScriptPage(BaseModel):
+    page_number: int
+    panels: List[ScriptPanel]
+    # NOTE: remove any previous “exactly 4 panels” validator here,
+    # because min/max are dynamic per-request.
+    art_description: str
+    dialogue: str
+    narration: str
+    sfx: str
+
+class ScriptPage(BaseModel):
+    page_number: int
+    panels: List[ScriptPanel]
+
+class FullScriptResponse(BaseModel):
+    title: str
+    tagline: str
+    cover_art_description: str
+    pages: List[ScriptPage]
