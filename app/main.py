@@ -172,6 +172,7 @@ async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
     )
 
     try:
+        log.debug(f"user prompt: {user_prompt}")
         resp = _text_client.chat.completions.create(
             model=_TEXT_MODEL,
             messages=[
@@ -193,6 +194,7 @@ async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
         ideas = [StoryIdea(**i) for i in data.get("ideas", [])][:3]
         if len(ideas) != 3:
             raise ValueError("Model did not return exactly 3 ideas")
+        log.debug(f"ideas response: {ideas}")
         return StoryIdeasResponse(ideas=ideas)
 
     except Exception as e:
