@@ -19,8 +19,6 @@ from app.schemas import (
     StoryIdea,
     FullScriptRequest,
     FullScriptResponse,
-    ScriptPage,
-    ScriptPanel
 )
 
 log = logger.get_logger(__name__)
@@ -147,16 +145,37 @@ async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
     Generate 3 funny story ideas (title + one-sentence synopsis) using the OpenAI chat API.
     """
     user_prompt = f"""
-        I will add answers to some questions
-        I want you to generate 3 hilarious stories ideas include 2 things- title and synopsis ( 1- generate a synopsis- one funny explanatory sentence catchy used for marketing to summarize the book's appeal, 2-  funny comic book name) for a funny comic book based on the questions
+        I will add answers to some questions.
+        Generate 3 hilarious story ideas, each with FOUR fields:
+        - title (funny comic book name)
+        - synopsis (ONE witty marketing sentence summarizing the appeal)
+        - character_description (compact, comma-separated attribute fragments, NOT a sentence)
+        - cover_art_description (1–3 sentences describing a dynamic movie-poster-style cover)
 
-        Here are the questions and the answers-
+        Rules for character_description:
+        - Format: compact, comma-separated attribute fragments (no full sentences).
+        - 4–8 fragments total, 1–4 words each. Examples:
+        good → "30s, techwear hoodie, expressive eyebrows, short dark hair"
+        good → "late 20s, lab coat, anxious energy, messy curls"
+        bad  → "A superhero who loves dancing in the rain..." (sentence ❌)
+        - No verbs, no proper names, no punctuation except commas.
+        - Lowercase, no trailing period. May include numerals like "30s", "6’2”".
+
+        Rules for cover_art_description:
+        - 1–3 sentences; vivid and specific; think “movie poster.”
+        - Mention camera angle/composition, the hero’s pose/expression, background/setting, lighting/mood, color palette, and any iconic prop/effect.
+        - Do NOT include text elements (titles/SFX/logos) in the description itself.
+        - No trademarks, no existing IP, no brand names.
+
+        Output ONLY the JSON. No markdown, no commentary.
+
+        Here are the questions and the answers—
 
         Whats the name of the main character? {req.name}
         Theme of the comic? {req.theme}
         What the character do for his work? {req.job}
         Whats his dream? {req.dream}
-        Where is Yaron from? {req.origin}
+        Where is {req.name} from? {req.origin}
         What his funny hobby? {req.hobby}
         What is something the character is saying often? "{req.catchphrase}"
         What does he know better than anyone? {req.super_skill}
@@ -167,7 +186,7 @@ async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
     system = (
         "You are a witty copywriter. Generate EXACTLY three ideas. "
         "Return STRICT JSON only, with shape: "
-        '{"ideas":[{"title":"string","synopsis":"string"},{"title":"string","synopsis":"string"},{"title":"string","synopsis":"string"}]} '
+        '{"ideas":[{"title":"string","synopsis":"string", "character_description": "string"},{"title":"string","synopsis":"string"},{"title":"string","synopsis":"string"}]} '
         "No extra text, no comments, no markdown. Each synopsis must be ONE punchy marketing sentence."
     )
 

@@ -109,7 +109,7 @@ async def generate_comic_cover_endpoint(
     payload: str = Form(...),            # JSON with {cover_art_description, user_theme}
     image: UploadFile = File(None),      # optional resemblance image
 ):
-    print("yoyo")
+    log.debug("yoyo")
     # Make job dir; auto-clean unless KEEP_OUTPUTS=true
     workdir = make_job_dir()
     if not config.keep_outputs:

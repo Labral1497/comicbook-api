@@ -77,9 +77,9 @@ def test_generate_zip_with_image(client):
 def _fake_story_ideas_response_json():
     return json.dumps({
         "ideas": [
-            {"title": "Cringe Crusader", "synopsis": "A hero so awkward, villains die laughing."},
-            {"title": "Monetize This!", "synopsis": "Profit meets parody in a caped crusade for cash."},
-            {"title": "Dubai Nights", "synopsis": "Shirtless dances meet high-rise heroics."}
+            {"title": "Cringe Crusader", "synopsis": "A hero so awkward, villains die laughing.", "character_description": "30s hero", "cover_art_description": "futuristic"},
+            {"title": "Monetize This!", "synopsis": "Profit meets parody in a caped crusade for cash.", "character_description": "30s hero", "cover_art_description": "futuristic"},
+            {"title": "Dubai Nights", "synopsis": "Shirtless dances meet high-rise heroics.", "character_description": "30s hero", "cover_art_description": "futuristic"}
         ]
     })
 
@@ -225,7 +225,7 @@ def _full_script_bad_schema_json():
         "pages": "not-a-list"          # wrong type
     }, ensure_ascii=False)
 
-async def _mock_full_script_llm_ok(_prompt: str) -> str:
+async def _mock_full_script_llm_ok(*args, **kwargs):
     return _full_script_ok_json()
 
 async def _mock_full_script_llm_bad(_prompt: str) -> str:
@@ -245,6 +245,7 @@ def _full_script_payload():
 def test_full_script_success(client, monkeypatch):
     # Patch LLM call inside app.main
     monkeypatch.setattr(main, "call_llm_return_json_string", _mock_full_script_llm_ok)
+    # monkeypatch.setattr(main, "call_llm_return_json_string",lambda *a, **k: _full_script_ok_json())
 
     resp = client.post("/api/v1/generate/comic/script", json=_full_script_payload())
     assert resp.status_code == 200, resp.text

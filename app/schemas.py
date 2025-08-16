@@ -40,6 +40,8 @@ class StoryIdeasRequest(BaseModel):
 class StoryIdea(BaseModel):
     title: str
     synopsis: str
+    character_description: str
+    cover_art_description: str
 
 class StoryIdeasResponse(BaseModel):
     ideas: List[StoryIdea]
@@ -66,16 +68,6 @@ class FullScriptRequest(BaseModel):
 
 class ScriptPanel(BaseModel):
     panel_number: int
-    art_description: str
-    dialogue: str
-    narration: str
-    sfx: str
-
-class ScriptPage(BaseModel):
-    page_number: int
-    panels: List[ScriptPanel]
-    # NOTE: remove any previous “exactly 4 panels” validator here,
-    # because min/max are dynamic per-request.
     art_description: str
     dialogue: str
     narration: str

@@ -44,7 +44,7 @@ def load_config() -> Config:
         keep_outputs=_env_bool("KEEP_OUTPUTS", True),
         base_output_dir=(Path(__file__).resolve().parent / "output"),
         max_workers=int(os.getenv("MAX_WORKERS", "4")),
-        log_level=os.getenv("LOG_LEVEL", "INFO"),
+        log_level=os.getenv("LOG_LEVEL", "DEBUG"),
     )
 
 # Load once and ensure output directory exists
