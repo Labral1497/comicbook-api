@@ -20,6 +20,7 @@ class Config:
     # OpenAI
     openai_api_key: str
     openai_image_model: str
+    openai_text_model: str
     image_size: str  # valid: 1024x1024, 1024x1536, 1536x1024, auto
 
     # API / CORS
@@ -35,6 +36,10 @@ class Config:
     # Logging
     log_level: str
 
+    gcs_bucket: str
+
+    signed_url_ttl: str
+
 def load_config() -> Config:
     return Config(
         openai_api_key=os.getenv("OPENAI_API_KEY", ""),
@@ -45,6 +50,9 @@ def load_config() -> Config:
         base_output_dir=(Path(__file__).resolve().parent / "output"),
         max_workers=int(os.getenv("MAX_WORKERS", "4")),
         log_level=os.getenv("LOG_LEVEL", "DEBUG"),
+        gcs_bucket = os.getenv("GCS_BUCKET", "ai-comic-books-assets"),
+        signed_url_ttl = int(os.getenv("GCS_SIGNED_URL_TTL", "3600")),
+        openai_text_model = os.getenv("OPENAI_TEXT_MODEL", "gpt-4o-mini")
     )
 
 # Load once and ensure output directory exists

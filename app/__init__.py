@@ -2,7 +2,8 @@
 from .config import config, make_job_dir
 from .logger import get_logger
 from .main import  generate_pages, make_pdf, story_ideas, generate_comic_cover, generate_full_script
-from .schemas import ComicRequest, StoryIdeasRequest, StoryIdeasResponse, StoryIdea, FullScriptResponse, FullScriptRequest
+from .schemas import ComicRequest, StoryIdeasRequest, StoryIdeasResponse, StoryIdea, FullScriptResponse, FullScriptRequest, GenerateCoverRequest
+from .gcs_inventory import _decode_image_b64, upload_to_gcs
 from .api import app  # if the instance is defined in app/api.py
 
 
@@ -20,5 +21,8 @@ __all__ = ["app",
            "generate_comic_cover",
            "FullScriptRequest",
            "FullScriptResponse",
-           "generate_full_script"
+           "generate_full_script",
+           "GenerateCoverRequest",
+           "_decode_image_b64",
+           "upload_to_gcs"
            ]

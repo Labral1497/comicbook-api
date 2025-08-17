@@ -24,8 +24,6 @@ from app.schemas import (
 log = logger.get_logger(__name__)
 _client = OpenAI(api_key=config.openai_api_key)
 _text_client = OpenAI(api_key=config.openai_api_key)
-_TEXT_MODEL = os.getenv("OPENAI_TEXT_MODEL", getattr(config, "openai_text_model", "gpt-4o-mini"))
-
 # ------------------------
 # IMAGE GENERATION (single)
 # ------------------------
@@ -193,7 +191,7 @@ async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
     try:
         log.debug(f"user prompt: {user_prompt}")
         resp = _text_client.chat.completions.create(
-            model=_TEXT_MODEL,
+            model=config.openai_text_model,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_prompt},
@@ -270,7 +268,7 @@ Create a vibrant, ultra-high-resolution comic book cover. The artwork should be 
 """.strip()
 
     log.info("Generating comic cover...")
-    log.info(f"prompt is: {prompt}")
+    log.debug(f"prompt is: {prompt}")
     resp = _client.images.generate(model=model, prompt=prompt, size=size, n=1)
     b64 = resp.data[0].b64_json
 
@@ -278,7 +276,7 @@ Create a vibrant, ultra-high-resolution comic book cover. The artwork should be 
     with open(output_path, "wb") as f:
         f.write(base64.b64decode(b64))
 
-    log.info(f"✅ Cover saved to {output_path}")
+    log.debug(f"✅ Cover saved to {output_path}")
     return output_path
 
 def build_full_script_prompt(req: FullScriptRequest) -> str:
@@ -382,7 +380,7 @@ async def call_llm_return_json_string(prompt: str) -> str:
     )
 
     resp = _text_client.chat.completions.create(
-        model=_TEXT_MODEL,
+        model=config.openai_text_model,
         temperature=0.2,
         response_format={
             "type": "json_schema",

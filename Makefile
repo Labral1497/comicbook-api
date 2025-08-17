@@ -1,8 +1,11 @@
 # -------- config --------
 PROJECT_ID ?= ai-comic-books
 REGION     ?= us-central1
-REPO       ?= comics-repo
+REPO       ?= ai-comics-repo
 SERVICE    ?= comics-api
+
+# GCS bucket for generated assets (override with: make ... BUCKET=my-bucket)
+BUCKET     ?= ai-comic-books-assets
 
 IMAGE := $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPO)/$(SERVICE)
 # Tag defaults to short git SHA, or timestamp if outside a git repo
@@ -18,10 +21,11 @@ DEPLOY_FLAGS = --region $(REGION) \
   --cpu 2 --memory 1Gi --concurrency 80 \
   --min-instances 0 --max-instances 50 \
   --timeout 600 --port 8080 \
-  --set-env-vars API_PREFIX=/api/v1,KEEP_OUTPUTS=false \
+  --set-env-vars API_PREFIX=/api/v1,KEEP_OUTPUTS=false,GCS_BUCKET=$(BUCKET) \
   --set-secrets OPENAI_API_KEY=OPENAI_API_KEY:latest
 
-.PHONY: all release build deploy logs url proxy describe ensure-repo configure-docker local docker-run
+.PHONY: all release build deploy logs url proxy describe ensure-repo configure-docker local docker-run \
+        ensure-bucket bucket-iam bucket-cors bucket-lifecycle set-bucket-env gcs-status
 
 all: release
 
@@ -66,3 +70,55 @@ ensure-repo:
 
 configure-docker:
 	gcloud auth configure-docker "$(REGION)-docker.pkg.dev"
+
+# ---------- GCS: bucket creation, IAM, CORS, lifecycle ----------
+
+# Create the bucket (idempotent), enable Storage API, lock down basics
+ensure-bucket:
+	gcloud services enable storage.googleapis.com
+	- gcloud storage buckets create gs://$(BUCKET) --project $(PROJECT_ID) --location $(REGION)
+	gcloud storage buckets update gs://$(BUCKET) --uniform-bucket-level-access --pap
+
+# Grant Cloud Run SA upload + signed-URL capability
+bucket-iam:
+	# allow object uploads
+	gcloud storage buckets add-iam-policy-binding gs://$(BUCKET) \
+	  --member="serviceAccount:$(SERVICE_SA)" \
+	  --role="roles/storage.objectCreator"
+	# allow V4 signed URLs without key files
+	gcloud iam service-accounts add-iam-policy-binding "$(SERVICE_SA)" \
+	  --member="serviceAccount:$(SERVICE_SA)" \
+	  --role="roles/iam.serviceAccountTokenCreator"
+
+# Set CORS so browsers can fetch signed URLs from your frontend origins
+bucket-cors:
+	@echo 'Writing cors.json'
+	@printf '%s\n' '[' \
+	'  {' \
+	'    "origin": ["https://lovable.dev/*","https://*.lovable.app", "http://localhost:8080"],' \
+	'    "method": ["GET","HEAD"],' \
+	'    "responseHeader": ["Content-Type"],' \
+	'    "maxAgeSeconds": 3600' \
+	'  }' \
+	']' > cors.json
+	gcloud storage buckets update gs://$(BUCKET) --cors-file=cors.json
+
+# Optional lifecycle: auto-delete covers after 30 days
+bucket-lifecycle:
+	@echo 'Writing lifecycle.json'
+	@printf '%s\n' '{' \
+	'  "rule": [' \
+	'    { "action": {"type": "Delete"}, "condition": {"age": 30, "matchesPrefix": ["covers/"]} }' \
+	'  ]' \
+	'}' > lifecycle.json
+	gcloud storage buckets update gs://$(BUCKET) --lifecycle-file=lifecycle.json
+
+# Wire bucket name into the service as env var (picked up on next deploy/update)
+set-bucket-env:
+	gcloud run services update "$(SERVICE)" --region $(REGION) \
+	  --set-env-vars GCS_BUCKET=$(BUCKET)
+
+# Quick status for the bucket (location, IAM members)
+gcs-status:
+	gcloud storage buckets describe gs://$(BUCKET) --format='yaml(location,iamConfiguration,labels,metageneration)'
+	gcloud storage buckets get-iam-policy gs://$(BUCKET) --format='table(bindings.role,bindings.members)'

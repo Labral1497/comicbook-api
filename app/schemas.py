@@ -1,5 +1,5 @@
 # app/schemas.py
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 class Page(BaseModel):
@@ -82,3 +82,13 @@ class FullScriptResponse(BaseModel):
     tagline: str
     cover_art_description: str
     pages: List[ScriptPage]
+
+class GenerateCoverRequest(BaseModel):
+    cover_art_description: str = Field(..., min_length=5, description="Detailed cover prompt")
+    user_theme: str = Field(..., min_length=1, description="Style/theme guidance")
+    # Optional image provided as base64 or data URL (e.g., 'data:image/png;base64,....')
+    image_base64: Optional[str] = Field(
+        None, description="Optional PNG/JPEG base64 (raw or data URL)"
+    )
+    # How the API returns the result
+    return_mode: Literal["signed_url", "inline", "base64"] = "signed_url"

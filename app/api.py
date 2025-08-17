@@ -1,4 +1,5 @@
 # api.py
+import base64
 import os, uuid, json, shutil
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
@@ -19,6 +20,9 @@ from app import (
     FullScriptResponse,
     FullScriptRequest,
     generate_full_script,
+    GenerateCoverRequest,
+    _decode_image_b64,
+    upload_to_gcs
 )
 api_prefix = "/api/v1"
 log = logger.get_logger(__name__)
@@ -105,47 +109,61 @@ async def story_ideas_endpoint(req: StoryIdeasRequest) -> StoryIdeasResponse:
 
 @app.post(api_prefix+"/generate/comic/cover")
 async def generate_comic_cover_endpoint(
+    req: GenerateCoverRequest,
     background_tasks: BackgroundTasks,
-    payload: str = Form(...),            # JSON with {cover_art_description, user_theme}
-    image: UploadFile = File(None),      # optional resemblance image
 ):
-    log.debug("yoyo")
+    log.info("yoyo")
     # Make job dir; auto-clean unless KEEP_OUTPUTS=true
     workdir = make_job_dir()
     if not config.keep_outputs:
         background_tasks.add_task(shutil.rmtree, str(workdir), ignore_errors=True)
 
-    # Parse payload
-    try:
-        data = json.loads(payload)
-        cover_art_description = data["cover_art_description"]
-        user_theme = data["user_theme"]
-    except Exception as e:
-        raise HTTPException(422, f"Invalid payload JSON: {e}")
-
     # Optional image save
     ref_path = None
-    if image:
-        if image.content_type not in {"image/png", "image/jpeg"}:
+    if req.image_base64:
+        try:
+            data, ctype = _decode_image_b64(req.image_base64)
+        except Exception as e:
+            raise HTTPException(400, f"Invalid image_base64: {e}")
+        if ctype not in {"image/png", "image/jpeg"}:
             raise HTTPException(400, "image must be PNG or JPEG")
         ref_path = os.path.join(workdir, "cover_ref.png")
+        # Always normalize to PNG for downstream tools
         with open(ref_path, "wb") as f:
-            f.write(await image.read())
+            f.write(data)
 
     # Generate cover
     out_path = os.path.join(workdir, "cover.png")
     try:
         generate_comic_cover(
-            cover_art_description=cover_art_description,
-            user_theme=user_theme,
+            cover_art_description=req.cover_art_description,
+            user_theme=req.user_theme,
             output_path=out_path,
             image_ref_path=ref_path,
         )
     except Exception as e:
-        log.exception("Cover generation failed")
+        # log.exception("Cover generation failed")  # if you have logging set up
         raise HTTPException(500, f"Cover generation failed: {e}")
-
-    return FileResponse(out_path, media_type="image/png", filename="comic_cover.png")
+    log.debug("koko3")
+    mode = req.return_mode
+    if mode == "inline":
+        return FileResponse(out_path, media_type="image/png", filename="comic_cover.png")
+    elif mode == "base64":
+        log.debug("koko3")
+        with open(out_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        return {"mime": "image/png", "base64": b64}
+    elif mode == "signed_url":
+        info = upload_to_gcs(out_path)  # requires GCS_BUCKET and service account perms
+        return {
+            "cover": info,
+            "meta": {
+                "user_theme": req.user_theme,
+                "cover_art_description": req.cover_art_description,
+            },
+        }
+    else:
+        raise HTTPException(422, "return_mode must be one of: signed_url, inline, base64")
 
 @app.post(api_prefix+"/generate/comic/script", response_model=FullScriptResponse)
 async def generate_full_script_endpoint(req: FullScriptRequest) -> FullScriptResponse:
