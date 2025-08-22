@@ -26,16 +26,21 @@ class ComicRequest(BaseModel):
     image_ref: Optional[str] = None
 
 class StoryIdeasRequest(BaseModel):
-    name: str = Field(..., description="Main character name")
-    theme: str
-    job: str
-    dream: str
-    origin: str
-    hobby: str
-    catchphrase: str
-    super_skill: str
-    favorite_place: str
-    taste_in_women: str
+    # Core
+    name: str = Field(..., description="Main character name")            # [User_Name]
+    theme: str = Field(..., description="Comic theme")                   # [User_Theme]
+    gender: Optional[str] = Field(None, description="Main character gender")            # [User_Gender]
+    purpose_of_gift: Optional[str] = Field(None, description="Occasion / Purpose of Gift")  # [Purpose_Of_Gift]
+
+    # Answers used to build [User_Answers_List]
+    job: Optional[str] = None
+    dream: Optional[str] = None
+    origin: Optional[str] = None
+    hobby: Optional[str] = None
+    catchphrase: Optional[str] = None
+    super_skill: Optional[str] = None
+    favorite_place: Optional[str] = None
+    taste_in_women: Optional[str] = None  # kept for backward compatibility
 
 class StoryIdea(BaseModel):
     title: str

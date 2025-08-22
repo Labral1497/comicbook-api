@@ -1,7 +1,7 @@
 # -------- config --------
 PROJECT_ID ?= ai-comic-books
 REGION     ?= us-central1
-REPO       ?= ai-comics-repo
+REPO       ?= comics-repo
 SERVICE    ?= comics-api
 
 # GCS bucket for generated assets (override with: make ... BUCKET=my-bucket)
@@ -13,6 +13,8 @@ TAG   ?= $(shell git rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)
 
 # Service account used by Cloud Run
 SERVICE_SA ?= $(SERVICE)-sa@$(PROJECT_ID).iam.gserviceaccount.com
+GCS_SIGNING_SERVICE_ACCOUNT ?= $(SERVICE_SA)
+GCS_SIGNED_URL_TTL ?= 3600
 
 # Common deploy flags
 DEPLOY_FLAGS = --region $(REGION) \
@@ -21,8 +23,9 @@ DEPLOY_FLAGS = --region $(REGION) \
   --cpu 2 --memory 1Gi --concurrency 80 \
   --min-instances 0 --max-instances 50 \
   --timeout 600 --port 8080 \
-  --set-env-vars API_PREFIX=/api/v1,KEEP_OUTPUTS=false,GCS_BUCKET=$(BUCKET) \
+  --set-env-vars API_PREFIX=/api/v1,KEEP_OUTPUTS=false,GCS_BUCKET=$(BUCKET),GCS_SIGNED_URL_TTL=$(GCS_SIGNED_URL_TTL),GCS_SIGNING_SERVICE_ACCOUNT=$(GCS_SIGNING_SERVICE_ACCOUNT) \
   --set-secrets OPENAI_API_KEY=OPENAI_API_KEY:latest
+
 
 .PHONY: all release build deploy logs url proxy describe ensure-repo configure-docker local docker-run \
         ensure-bucket bucket-iam bucket-cors bucket-lifecycle set-bucket-env gcs-status

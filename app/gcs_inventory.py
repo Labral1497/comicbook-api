@@ -1,4 +1,5 @@
 import base64
+import os
 import re
 import uuid
 from datetime import timedelta
@@ -16,6 +17,35 @@ def _client():
     if _storage is None:
         _storage = storage.Client()
     return _storage
+
+def _signing_creds():
+    import google.auth
+    from google.auth import impersonated_credentials
+    # Base creds from runtime (Cloud Run SA token)
+    base_creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    # If we already have a signer (e.g., SA key file), use it
+    if getattr(base_creds, "signer", None):
+        return base_creds
+    # Otherwise impersonate a service account that CAN sign
+    target_sa = os.getenv("GCS_SIGNING_SERVICE_ACCOUNT")
+    if not target_sa:
+        # Try to read the default SA email from metadata
+        try:
+            from google.auth.compute_engine import metadata
+            target_sa = metadata.get_service_account_email()
+        except Exception:
+            pass
+    if not target_sa:
+        raise HTTPException(500, "Cannot sign URLs: set GCS_SIGNING_SERVICE_ACCOUNT to the service account email.")
+    return impersonated_credentials.Credentials(
+        source_credentials=base_creds,
+        target_principal=target_sa,
+        target_scopes=[
+            "https://www.googleapis.com/auth/devstorage.read_write",
+            "https://www.googleapis.com/auth/cloud-platform",
+        ],
+        lifetime=3600,
+    )
 
 def upload_to_gcs(local_path: str, *, subdir: str = "covers") -> dict:
     log.debug("koko0")
@@ -35,6 +65,7 @@ def upload_to_gcs(local_path: str, *, subdir: str = "covers") -> dict:
         method="GET",
         response_disposition='inline; filename="comic_cover.png"',
         response_type="image/png",
+        credentials=_signing_creds(),
     )
     log.debug("koko2")
     return {

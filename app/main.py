@@ -3,6 +3,7 @@ import base64
 import concurrent.futures
 import json
 import os
+import re
 import time
 from typing import List, Optional
 from pydantic import ValidationError
@@ -137,55 +138,84 @@ def make_pdf(files: List[str], pdf_name: str = "comic.pdf") -> str:
     print(f"📄 Comic saved as {pdf_name}")
     return pdf_name
 
+def _build_user_answers_list(req) -> str:
+    """Condense the user's answers into a compact, single-line list."""
+    parts = []
+    if getattr(req, "job", None):            parts.append(f"job: {req.job}")
+    if getattr(req, "dream", None):          parts.append(f"dream: {req.dream}")
+    if getattr(req, "origin", None):         parts.append(f"origin: {req.origin}")
+    if getattr(req, "hobby", None):          parts.append(f"hobby: {req.hobby}")
+    if getattr(req, "catchphrase", None):    parts.append(f'catchphrase: "{req.catchphrase}"')
+    if getattr(req, "super_skill", None):    parts.append(f"super-skill: {req.super_skill}")
+    if getattr(req, "favorite_place", None): parts.append(f"favorite place: {req.favorite_place}")
+    if getattr(req, "taste_in_women", None): parts.append(f"taste in women: {req.taste_in_women}")
+    return "; ".join(p for p in parts if p)
 
 async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
     """
     Generate 3 funny story ideas (title + one-sentence synopsis) using the OpenAI chat API.
     """
-    user_prompt = f"""
-        I will add answers to some questions.
-        Generate 3 hilarious story ideas, each with FOUR fields:
-        - title (funny comic book name)
-        - synopsis (ONE witty marketing sentence summarizing the appeal)
-        - character_description (compact, comma-separated attribute fragments, NOT a sentence)
-        - cover_art_description (1–3 sentences describing a dynamic movie-poster-style cover)
+    """Condense the user's answers into a compact, single-line list."""
 
-        Rules for character_description:
-        - Format: compact, comma-separated attribute fragments (no full sentences).
-        - 4–8 fragments total, 1–4 words each. Examples:
-        good → "30s, techwear hoodie, expressive eyebrows, short dark hair"
-        good → "late 20s, lab coat, anxious energy, messy curls"
-        bad  → "A superhero who loves dancing in the rain..." (sentence ❌)
-        - No verbs, no proper names, no punctuation except commas.
-        - Lowercase, no trailing period. May include numerals like "30s", "6’2”".
+    user_gender = getattr(req, "gender", "unspecified")
+    purpose     = getattr(req, "purpose_of_gift", "general gift")
+    answers     = _build_user_answers_list(req)
 
-        Rules for cover_art_description:
-        - 1–3 sentences; vivid and specific; think “movie poster.”
-        - Mention camera angle/composition, the hero’s pose/expression, background/setting, lighting/mood, color palette, and any iconic prop/effect.
-        - Do NOT include text elements (titles/SFX/logos) in the description itself.
-        - No trademarks, no existing IP, no brand names.
+    PROMPT_TEMPLATE = """You are a world-class creative director for a comedy comic book publisher, renowned for your ability to instantly pitch hilarious and marketable concepts. Your task is to generate 3 distinct comic book ideas based on the user profile below.
 
-        Output ONLY the JSON. No markdown, no commentary.
+    **USER PROFILE:**
 
-        Here are the questions and the answers—
+    * **Character Name:** "[User_Name]"
+    * **Character Gender:** "[User_Gender]"
+    * **Comic Theme:** "[User_Theme]"
+    * **Key Character Insights (from their answers):** "[User_Answers_List]"
+    * **Occasion / Purpose of Gift:** "[Purpose_Of_Gift]"
 
-        Whats the name of the main character? {req.name}
-        Theme of the comic? {req.theme}
-        What the character do for his work? {req.job}
-        Whats his dream? {req.dream}
-        Where is {req.name} from? {req.origin}
-        What his funny hobby? {req.hobby}
-        What is something the character is saying often? "{req.catchphrase}"
-        What does he know better than anyone? {req.super_skill}
-        Whats his favorite place? {req.favorite_place}
-        What his taste in woman? {req.taste_in_women}
-        """.strip()
+    **PRIMARY DIRECTIVE:**
+
+Generate 3 unique and hilarious comic book ideas. For each idea, you must provide a catchy title, a one-sentence marketing synopsis, a vivid cover_art_description, and a quirky character_description. The style of humor should be tailored to the "Occasion / Purpose of Gift". The final output must be a single, clean JSON array of three objects.
+    **JSON SCHEMA (Your entire output MUST be a single JSON object that follows this exact structure):**
+
+    ```json
+    [
+    {
+        "title": "Hilarious and Witty Title for Idea 1",
+        "synopsis": "A catchy, funny, one-sentence marketing description that summarizes the appeal of idea 1.",
+        "character_description": "compact, comma-separated attribute fragments (no sentence)",
+        "cover_art_description": "1–3 vivid sentences, movie-poster style cover description"
+    },
+    {
+        "title": "Hilarious and Witty Title for Idea 2",
+        "synopsis": "A catchy, funny, one-sentence marketing description that summarizes the appeal of idea 2.",
+        "character_description": "compact, comma-separated attribute fragments (no sentence)",
+        "cover_art_description": "1–3 vivid sentences, movie-poster style cover description"
+    },
+    {
+        "title": "Hilarious and Witty Title for Idea 3",
+        "synopsis": "A catchy, funny, one-sentence marketing description that summarizes the appeal of idea 3.",
+        "character_description": "compact, comma-separated attribute fragments (no sentence)",
+        "cover_art_description": "1–3 vivid sentences, movie-poster style cover description"
+    }
+    ]
+    ```"""
+
+    user_prompt = (
+        PROMPT_TEMPLATE
+        .replace("[User_Name]", req.name)
+        .replace("[User_Gender]", user_gender)
+        .replace("[User_Theme]", req.theme)
+        .replace("[User_Answers_List]", answers)
+        .replace("[Purpose_Of_Gift]", purpose)
+    )
 
     system = (
-        "You are a witty copywriter. Generate EXACTLY three ideas. "
-        "Return STRICT JSON only, with shape: "
-        '{"ideas":[{"title":"string","synopsis":"string", "character_description": "string"},{"title":"string","synopsis":"string"},{"title":"string","synopsis":"string"}]} '
-        "No extra text, no comments, no markdown. Each synopsis must be ONE punchy marketing sentence."
+        "You are a witty, concise copywriter. "
+        "Return STRICT JSON only — exactly a JSON array of three objects, each with the keys "
+        "'title', 'synopsis', 'character_description', and 'cover_art_description' (all strings). "
+        "No extra text, no comments, no markdown. "
+        "Each synopsis must be ONE punchy marketing sentence tailored to the given occasion. "
+        "For 'character_description', output compact, comma-separated attribute fragments (no sentences; 4–8 fragments; lowercase; no verbs; numerals allowed). "
+        "For 'cover_art_description', output 1–3 vivid sentences describing a movie-poster-style cover (camera/composition, pose/expression, background/lighting/color), with no trademarks or text elements."
     )
 
     try:
@@ -200,23 +230,68 @@ async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
         )
         raw = (resp.choices[0].message.content or "").strip()
 
-        # Strip code fences if present
-        cleaned = raw
-        if cleaned.startswith("```"):
-            cleaned = cleaned.strip("`")
-            if cleaned.lower().startswith("json"):
-                cleaned = cleaned[4:].lstrip()
-
+        cleaned = _extract_json_block(raw)
         data = json.loads(cleaned)
-        ideas = [StoryIdea(**i) for i in data.get("ideas", [])][:3]
+
+        ideas_list = _normalize_ideas(data)
+        # Keep only the first 3, map to your Pydantic model
+        ideas = [StoryIdea(title=i["title"], synopsis=i["synopsis"], character_description=i["character_description"], cover_art_description=i["cover_art_description"])
+                for i in ideas_list[:3]]
+
         if len(ideas) != 3:
-            raise ValueError("Model did not return exactly 3 ideas")
+            raise ValueError(f"Model did not return exactly 3 ideas (got {len(ideas)})")
+
         log.debug(f"ideas response: {ideas}")
         return StoryIdeasResponse(ideas=ideas)
 
     except Exception as e:
         log.error(f"/story-ideas parse error: {e}")
         return StoryIdeasResponse(ideas=[])
+
+
+def _extract_json_block(text: str) -> str:
+    """Strip code fences and try to extract a top-level JSON array or object."""
+    s = text.strip()
+
+    # Remove ```...``` code fences (with or without "json")
+    if s.startswith("```"):
+        # remove leading/trailing triple backticks
+        s = re.sub(r"^```(?:json)?\s*", "", s, flags=re.IGNORECASE)
+        s = re.sub(r"\s*```$", "", s)
+
+    # Try as-is first
+    try:
+        json.loads(s)
+        return s
+    except Exception:
+        pass
+
+    # Fallback: extract the first top-level array or object
+    # Prefer array (since your new prompt returns a JSON array)
+    m = re.search(r"\[.*\]", s, flags=re.DOTALL)
+    if m:
+        return m.group(0)
+    m = re.search(r"\{.*\}", s, flags=re.DOTALL)
+    if m:
+        return m.group(0)
+
+    # Give up – will be handled by caller
+    return s
+
+def _normalize_ideas(payload) -> List[dict]:
+    """Return a list[dict] of idea objects from either a dict-with-ideas or a bare array."""
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        # common keys we accept
+        for key in ("ideas", "data", "results"):
+            if key in payload and isinstance(payload[key], list):
+                return payload[key]
+        # last resort: pick the first list of dicts that looks like ideas
+        for v in payload.values():
+            if isinstance(v, list) and v and isinstance(v[0], dict):
+                return v
+    raise ValueError("Could not find ideas array in model response")
 
 def generate_comic_cover(
     cover_art_description: str,
@@ -234,38 +309,40 @@ def generate_comic_cover(
     model = model or config.openai_image_model
     # Cover wants “4K” in spirit; actual allowed sizes are limited—use config or "auto"
     size = size or config.image_size  # valid: 1024x1024 | 1024x1536 | 1536x1024 | auto
-
     ref_block = ""
     if image_ref_path:
         ref_block = (
-            f"\n**REFERENCE PHOTO (MANDATORY):** The main character must closely resemble "
-            f"the person in this image file path: {image_ref_path}. Focus on hairstyle, hair color/patterns, "
-            f"eyebrow shape, eye area (don’t invent eye color if obscured), facial hair style, skin tone, and "
-            f"visible head/face accessories (glasses, hats, piercings, earrings)."
+            f"**REFERENCE (HIGHEST PRIORITY):** The main character's face and unique features "
+            f"MUST closely match the person in the reference image provided at **{image_ref_path}**. "
+            "This is the most important rule.\n\n"
         )
 
-    prompt = f"""
-Create a vibrant, ultra-high-resolution comic book cover. The artwork should be a masterpiece of digital illustration, suitable for a professional digital print.
-
-**PRIMARY SUBJECT & SCENE (MANDATORY):**
-* **Main Character Resemblance:** The central figure must be illustrated to closely resemble the person in the provided image. **Focus specifically on these unique facial features, hair, and head/face accessories:** hairstyle, hair color and patterns, eyebrow shape, eye area (without guessing eye color if hidden), facial hair style (if any), skin tone, and any notable accessories such as glasses, hats, piercings, or earrings visible in the image.
-* **Scene Description:** The illustration must bring this scene to life: **"{cover_art_description}"**. Capture the action, expression, and mood described in the scene, ensuring the main character is central to this scene and rendered with the specified resemblance.
-{ref_block}
-
-**ARTISTIC STYLE & EXECUTION (MANDATORY):**
-* **Core Style:** Professional digital comic book art. Bold, clean line work with dynamic, cinematic lighting and shadows.
-* **Theme Influence:** The visual style should be heavily influenced by the **"{user_theme}"** theme.
-* **Color Palette:** Use a vibrant, saturated, and eye-catching color palette that makes the cover pop. Unless the theme requires otherwise.
-* **Quality:** Render with hyper-detailed, sharp focus, epic quality (cover-grade).
-
-**COMMERCIAL DETAILS (MANDATORY):**
-* To make this look like an authentic comic book you would find in a store, you MUST include the following elements:
-  1. **Barcode:** Place a realistic-looking UPC barcode in the bottom corner (e.g., bottom-left).
-  2. **Humorous Sticker/Burst:** Add a fun, flashy sticker or starburst shape somewhere on the cover with a funny emblem (no real text).
-
-**CRITICAL RULE:**
-* **No real-world brands or text.** All branding and text on the commercial details (barcode, sticker, etc.) must be completely fictional. Use gibberish or non-sensical symbols instead of legible characters to avoid any trademark issues.
-""".strip()
+    prompt = (
+        "Create a vibrant, ultra-high-resolution comic book cover. The artwork should be a masterpiece "
+        "of digital illustration, suitable for a professional digital print.\n\n"
+        f"{ref_block}"
+        "**PRIMARY SUBJECT & SCENE (MANDATORY):**\n"
+        "* **Main Character Resemblance:** The central figure must be illustrated to closely resemble the person in the provided image. "
+        "**Focus specifically on these unique facial features, hair, and head/face accessories:** hairstyle, hair color and patterns, "
+        "eyebrow shape, eye area (without guessing eye color if hidden), facial hair style (if any), skin tone, and any notable accessories "
+        "such as glasses, hats, piercings, or earrings visible in the image.\n"
+        f"* **Scene Description:** The illustration must bring this scene to life: **\"{cover_art_description}\"**. "
+        "Capture the action, expression, and mood described in the scene, ensuring the main character is central to this scene and rendered "
+        "with the specified resemblance.\n\n"
+        "**ARTISTIC STYLE & EXECUTION (MANDATORY):**\n"
+        "* **Core Style:** Professional digital comic book art. Bold, clean line work with dynamic, cinematic lighting and shadows.\n"
+        f"* **Theme Influence:** The visual style should be heavily influenced by the **\"{user_theme}\"** theme.\n"
+        "* **Color Palette:** Use a vibrant, saturated, and eye-catching color palette that makes the cover pop, "
+        f"unless the {user_theme} theme requires a different palette.\n"
+        "* **Quality:** Render in 4K resolution, hyper-detailed, with sharp focus and epic quality.\n\n"
+        "**COMMERCIAL DETAILS (MANDATORY):**\n"
+        "* To make this look like an authentic comic book you would find in a store, you MUST include the following elements:\n"
+        "  1. **Barcode:** Place a realistic-looking UPC barcode in the bottom corner (e.g., bottom-left).\n"
+        "  2. **Humorous Sticker/Burst:** Add a fun, flashy sticker or starburst shape somewhere on the cover with a funny emblem (no real text).\n\n"
+        "**CRITICAL RULE:**\n"
+        "* **No real-world brands or text.** All branding and text on the commercial details (barcode, sticker, etc.) must be completely fictional. "
+        "Use gibberish or non-sensical symbols instead of legible characters to avoid any trademark issues."
+    ).strip()
 
     log.info("Generating comic cover...")
     log.debug(f"prompt is: {prompt}")
