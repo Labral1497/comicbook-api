@@ -20,6 +20,8 @@ from app.schemas import (
     StoryIdea,
     FullScriptRequest,
     FullScriptResponse,
+    CoverScriptRequest,
+    CoverScriptResponse
 )
 
 log = logger.get_logger(__name__)
@@ -159,7 +161,12 @@ async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
 
     user_gender = getattr(req, "gender", "unspecified")
     purpose     = getattr(req, "purpose_of_gift", "general gift")
-    answers     = _build_user_answers_list(req)
+    # answers     = _build_user_answers_list(req)
+    if isinstance(req.user_answers_list, dict) and req.user_answers_list:
+        traits = ", ".join([f"{q} - {a}" for q, a in req.user_answers_list.items()])
+    else:
+        # fallback in case it's still just a list
+        traits = ", ".join(req.user_answers_list) if req.user_answers_list else ""
 
     PROMPT_TEMPLATE = """You are a world-class creative director for a comedy comic book publisher, renowned for your ability to instantly pitch hilarious and marketable concepts. Your task is to generate 3 distinct comic book ideas based on the user profile below.
 
@@ -173,28 +180,23 @@ async def story_ideas(req: StoryIdeasRequest) -> StoryIdeasResponse:
 
     **PRIMARY DIRECTIVE:**
 
-Generate 3 unique and hilarious comic book ideas. For each idea, you must provide a catchy title, a one-sentence marketing synopsis, a vivid cover_art_description, and a quirky character_description. The style of humor should be tailored to the "Occasion / Purpose of Gift". The final output must be a single, clean JSON array of three objects.
+    Generate 3 unique and hilarious comic book ideas. For each idea, you must provide a catchy title and a one-sentence marketing synopsis. The style of humor should be tailored to the "Occasion / Purpose of Gift". The final output must be a single, clean JSON array of three objects.
+
     **JSON SCHEMA (Your entire output MUST be a single JSON object that follows this exact structure):**
 
     ```json
     [
     {
         "title": "Hilarious and Witty Title for Idea 1",
-        "synopsis": "A catchy, funny, one-sentence marketing description that summarizes the appeal of idea 1.",
-        "character_description": "compact, comma-separated attribute fragments (no sentence)",
-        "cover_art_description": "1–3 vivid sentences, movie-poster style cover description"
+        "synopsis": "A catchy, funny, one-sentence marketing description that summarizes the appeal of idea 1."
     },
     {
         "title": "Hilarious and Witty Title for Idea 2",
-        "synopsis": "A catchy, funny, one-sentence marketing description that summarizes the appeal of idea 2.",
-        "character_description": "compact, comma-separated attribute fragments (no sentence)",
-        "cover_art_description": "1–3 vivid sentences, movie-poster style cover description"
+        "synopsis": "A catchy, funny, one-sentence marketing description that summarizes the appeal of idea 2."
     },
     {
         "title": "Hilarious and Witty Title for Idea 3",
-        "synopsis": "A catchy, funny, one-sentence marketing description that summarizes the appeal of idea 3.",
-        "character_description": "compact, comma-separated attribute fragments (no sentence)",
-        "cover_art_description": "1–3 vivid sentences, movie-poster style cover description"
+        "synopsis": "A catchy, funny, one-sentence marketing description that summarizes the appeal of idea 3."
     }
     ]
     ```"""
@@ -204,18 +206,16 @@ Generate 3 unique and hilarious comic book ideas. For each idea, you must provid
         .replace("[User_Name]", req.name)
         .replace("[User_Gender]", user_gender)
         .replace("[User_Theme]", req.theme)
-        .replace("[User_Answers_List]", answers)
+        .replace("[User_Answers_List]", traits)
         .replace("[Purpose_Of_Gift]", purpose)
     )
 
     system = (
         "You are a witty, concise copywriter. "
         "Return STRICT JSON only — exactly a JSON array of three objects, each with the keys "
-        "'title', 'synopsis', 'character_description', and 'cover_art_description' (all strings). "
+        "'title' and 'synopsis' (both strings). "
         "No extra text, no comments, no markdown. "
-        "Each synopsis must be ONE punchy marketing sentence tailored to the given occasion. "
-        "For 'character_description', output compact, comma-separated attribute fragments (no sentences; 4–8 fragments; lowercase; no verbs; numerals allowed). "
-        "For 'cover_art_description', output 1–3 vivid sentences describing a movie-poster-style cover (camera/composition, pose/expression, background/lighting/color), with no trademarks or text elements."
+        "Each synopsis must be ONE punchy marketing sentence tailored to the given occasion."
     )
 
     try:
@@ -235,7 +235,7 @@ Generate 3 unique and hilarious comic book ideas. For each idea, you must provid
 
         ideas_list = _normalize_ideas(data)
         # Keep only the first 3, map to your Pydantic model
-        ideas = [StoryIdea(title=i["title"], synopsis=i["synopsis"], character_description=i["character_description"], cover_art_description=i["cover_art_description"])
+        ideas = [StoryIdea(title=i["title"], synopsis=i["synopsis"])
                 for i in ideas_list[:3]]
 
         if len(ideas) != 3:
@@ -298,6 +298,8 @@ def generate_comic_cover(
     user_theme: str,
     *,
     output_path: str,
+    title: str,
+    tagline: str,
     image_ref_path: Optional[str] = None,
     model: Optional[str] = None,
     size: Optional[str] = None,
@@ -309,31 +311,24 @@ def generate_comic_cover(
     model = model or config.openai_image_model
     # Cover wants “4K” in spirit; actual allowed sizes are limited—use config or "auto"
     size = size or config.image_size  # valid: 1024x1024 | 1024x1536 | 1536x1024 | auto
-    ref_block = ""
-    if image_ref_path:
-        ref_block = (
-            f"**REFERENCE (HIGHEST PRIORITY):** The main character's face and unique features "
-            f"MUST closely match the person in the reference image provided at **{image_ref_path}**. "
-            "This is the most important rule.\n\n"
-        )
-
     prompt = (
         "Create a vibrant, ultra-high-resolution comic book cover. The artwork should be a masterpiece "
         "of digital illustration, suitable for a professional digital print.\n\n"
-        f"{ref_block}"
+        f"**REFERENCE (HIGHEST PRIORITY):** The main character's face and unique features MUST closely match "
+        f"the person in the reference image provided at **{image_ref_path}**. This is the most important rule.\n\n"
         "**PRIMARY SUBJECT & SCENE (MANDATORY):**\n"
         "* **Main Character Resemblance:** The central figure must be illustrated to closely resemble the person in the provided image. "
         "**Focus specifically on these unique facial features, hair, and head/face accessories:** hairstyle, hair color and patterns, "
         "eyebrow shape, eye area (without guessing eye color if hidden), facial hair style (if any), skin tone, and any notable accessories "
         "such as glasses, hats, piercings, or earrings visible in the image.\n"
-        f"* **Scene Description:** The illustration must bring this scene to life: **\"{cover_art_description}\"**. "
-        "Capture the action, expression, and mood described in the scene, ensuring the main character is central to this scene and rendered "
-        "with the specified resemblance.\n\n"
+        f"* **Scene Description:** The illustration must bring this scene to life: **[\"title\": \"{title}\", \"tagline\": \"{tagline}\", \"cover_art_description\": \"{cover_art_description}\"]** "
+        "Capture the action, expression, and mood described in the scene, ensuring the main character is central to this scene "
+        "and rendered with the specified resemblance.\n\n"
         "**ARTISTIC STYLE & EXECUTION (MANDATORY):**\n"
         "* **Core Style:** Professional digital comic book art. Bold, clean line work with dynamic, cinematic lighting and shadows.\n"
         f"* **Theme Influence:** The visual style should be heavily influenced by the **\"{user_theme}\"** theme.\n"
         "* **Color Palette:** Use a vibrant, saturated, and eye-catching color palette that makes the cover pop, "
-        f"unless the {user_theme} theme requires a different palette.\n"
+        "unless the theme requires a different color palette.\n"
         "* **Quality:** Render in 4K resolution, hyper-detailed, with sharp focus and epic quality.\n\n"
         "**COMMERCIAL DETAILS (MANDATORY):**\n"
         "* To make this look like an authentic comic book you would find in a store, you MUST include the following elements:\n"
@@ -343,6 +338,7 @@ def generate_comic_cover(
         "* **No real-world brands or text.** All branding and text on the commercial details (barcode, sticker, etc.) must be completely fictional. "
         "Use gibberish or non-sensical symbols instead of legible characters to avoid any trademark issues."
     ).strip()
+
 
     log.info("Generating comic cover...")
     log.debug(f"prompt is: {prompt}")
@@ -357,15 +353,18 @@ def generate_comic_cover(
     return output_path
 
 def build_full_script_prompt(req: FullScriptRequest) -> str:
-    traits = ", ".join(req.user_answers_list) if req.user_answers_list else ""
+    if isinstance(req.user_answers_list, dict) and req.user_answers_list:
+        traits = ", ".join([f"{q} - {a}" for q, a in req.user_answers_list.items()])
+    else:
+        # fallback in case it's still just a list
+        traits = ", ".join(req.user_answers_list) if req.user_answers_list else ""
     return f"""
 You are an elite-level comic book writer and storyboard artist, a creative fusion of a master storyteller known for wit and charm, and a film director known for brilliant visual comedy. Your task is to write a complete, hilarious, and visually rich comic book script from start to finish, formatted as a single, clean JSON object.
 
 CONTEXT & INPUTS:
-* Story Synopsis to Adapt: "{req.chosen_story_idea}"
+* Story Synopsis to Adapt: [\"title\": \"{req.title}\", \"synopsis\": \"{req.synopsis}\"]"
 * Main Character Name: "{req.user_name}"
 * Main Character Gender: "{req.user_gender}"
-* Definitive Character Description (for illustration consistency): "{req.character_description}"
 * Total Page Count: "{req.page_count}"
 * Core Theme: "{req.user_theme}"
 * Character's Comedic Traits (Source material for jokes, use them creatively): "{traits}"
@@ -498,6 +497,70 @@ async def generate_full_script(req: FullScriptRequest) -> FullScriptResponse:
         return parse_raw_as(FullScriptResponse, cleaned)
     except ValidationError as ve:
         raise ve
+
+def build_cover_script_prompt(req: CoverScriptRequest) -> str:
+    traits = ", ".join([f"{q} - {a}" for q, a in req.user_answers_list.items()]) if req.user_answers_list else ""
+
+    return f"""
+You are an elite-level comic book writer and storyboard artist, a creative fusion of a master storyteller known for wit and charm, and a film director known for brilliant visual comedy. Your task is to write a concept for a hilarious and visually rich comic book, formatted as a single, clean JSON object.
+
+CONTEXT & INPUTS:
+Story Synopsis to Adapt: [\"title\": \"{req.title}\", \"synopsis\": \"{req.synopsis}\"]"
+Main Character Name: "{req.name}"
+Main Character Gender: "{req.gender or "unspecified"}"
+Total Page Count: "{req.page_count}"
+Core Theme: "{req.theme}"
+Character's Comedic Traits (Source material for jokes, use them creatively): "{traits}"
+
+PRIMARY DIRECTIVE:
+Generate a comic book cover concept and a concise story summary that expands upon the chosen synopsis. The script must be returned as a single JSON object, adhering strictly to the schema and creative mandates outlined below.
+
+CREATIVE MANDATES & RULES:
+Character Appearance: Do not add any facial accessories like masks or glasses to the main character in the cover_art_description, or anything that might damage their resemblance to the source photo.
+Cover Simplicity: The cover_art_description must prioritize a strong and clear focal point. The background should be thematic but uncluttered to ensure the character's likeness is the priority.
+
+JSON SCHEMA (Your entire output MUST be a single JSON object that follows this exact structure):
+
+{{
+  "title": "A Catchy and Funny Title for the Comic",
+  "tagline": "A Hilarious Subtitle or Punchy Quote",
+  "cover_art_description": "A highly detailed description of a dynamic and exciting cover image. Describe the character's pose, expression, the background, the mood, and the central action. This should be like a 'movie poster' for the story.",
+  "story_summary": "A concise summary of the full story arc, from beginning to end, in a single paragraph of 3-8 sentences. This summary must expand on the chosen synopsis and will be used later to write the full comic book script."
+}}
+"""
+
+async def generate_cover_script(req: CoverScriptRequest) -> CoverScriptResponse:
+    prompt = build_cover_script_prompt(req)
+
+
+    SYSTEM_MSG = (
+        "You are a witty, concise comic writer and storyboard artist. "
+        "Return STRICT JSON only — exactly one JSON object with the keys "
+        "'title', 'tagline', 'cover_art_description', and 'story_summary' (all strings). "
+        "No extra text, no comments, no markdown."
+    )
+    # Call Chat API
+    resp = _client.chat.completions.create(
+        model="gpt-4o-mini",
+        temperature=0.7,
+        messages=[
+            {"role": "system", "content": SYSTEM_MSG},
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    raw = resp.choices[0].message.content.strip()
+
+    # Parse & validate against CoverScriptResponse
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Model did not return valid JSON: {e}\nRaw: {raw}") from e
+
+    try:
+        return CoverScriptResponse(**data)
+    except ValidationError as e:
+        raise ValueError(f"Model JSON failed validation: {e}\nData: {data}") from e
 
 
 # ------------------------

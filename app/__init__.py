@@ -1,8 +1,8 @@
 # app/__init__.py
 from .config import config, make_job_dir
 from .logger import get_logger
-from .main import  generate_pages, make_pdf, story_ideas, generate_comic_cover, generate_full_script
-from .schemas import ComicRequest, StoryIdeasRequest, StoryIdeasResponse, StoryIdea, FullScriptResponse, FullScriptRequest, GenerateCoverRequest
+from .main import  generate_pages, make_pdf, story_ideas, generate_comic_cover, generate_full_script, build_cover_script_prompt, generate_cover_script
+from .schemas import ComicRequest, StoryIdeasRequest, StoryIdeasResponse, StoryIdea, FullScriptResponse, FullScriptRequest, GenerateCoverRequest, CoverScriptRequest, CoverScriptResponse
 from .gcs_inventory import _decode_image_b64, upload_to_gcs
 from .api import app  # if the instance is defined in app/api.py
 
@@ -24,5 +24,9 @@ __all__ = ["app",
            "generate_full_script",
            "GenerateCoverRequest",
            "_decode_image_b64",
-           "upload_to_gcs"
+           "upload_to_gcs",
+           "CoverScriptRequest"
+           "build_cover_script_prompt",
+           "CoverScriptResponse",
+           "generate_cover_script"
            ]

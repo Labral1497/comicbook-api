@@ -1,5 +1,5 @@
 # app/schemas.py
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Dict
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 class Page(BaseModel):
@@ -31,34 +31,23 @@ class StoryIdeasRequest(BaseModel):
     theme: str = Field(..., description="Comic theme")                   # [User_Theme]
     gender: Optional[str] = Field(None, description="Main character gender")            # [User_Gender]
     purpose_of_gift: Optional[str] = Field(None, description="Occasion / Purpose of Gift")  # [Purpose_Of_Gift]
-
-    # Answers used to build [User_Answers_List]
-    job: Optional[str] = None
-    dream: Optional[str] = None
-    origin: Optional[str] = None
-    hobby: Optional[str] = None
-    catchphrase: Optional[str] = None
-    super_skill: Optional[str] = None
-    favorite_place: Optional[str] = None
-    taste_in_women: Optional[str] = None  # kept for backward compatibility
+    user_answers_list: Dict[str, str] = Field(default_factory=dict, description="Comedic Q&A pairs (question → answer)")
 
 class StoryIdea(BaseModel):
     title: str
     synopsis: str
-    character_description: str
-    cover_art_description: str
-
 class StoryIdeasResponse(BaseModel):
     ideas: List[StoryIdea]
 
 class FullScriptRequest(BaseModel):
-    chosen_story_idea: str = Field(..., description="Story Synopsis to Adapt")
+    title: str
+    synopsis: str = Field(..., description="Story Synopsis to Adapt")
     user_name: str = Field(..., description="Main Character Name")
     user_gender: str = Field(..., description="Main Character Gender")
     character_description: str = Field(..., description="Definitive Character Description for illustration consistency")
     page_count: int = Field(..., gt=0, description="Total Page Count")
     user_theme: str = Field(..., description="Core Theme")
-    user_answers_list: List[str] = Field(default_factory=list, description="Comedic traits / joke sources")
+    user_answers_list: Dict[str, str] = Field(default_factory=dict, description="Comedic Q&A pairs (question → answer)")
 
     # NEW: user-provided panel bounds
     min_panels_per_page: int = Field(4, ge=1, description="Minimum panels per page")
@@ -91,9 +80,41 @@ class FullScriptResponse(BaseModel):
 class GenerateCoverRequest(BaseModel):
     cover_art_description: str = Field(..., min_length=5, description="Detailed cover prompt")
     user_theme: str = Field(..., min_length=1, description="Style/theme guidance")
+    title: str
+    tagline: str
     # Optional image provided as base64 or data URL (e.g., 'data:image/png;base64,....')
     image_base64: Optional[str] = Field(
         None, description="Optional PNG/JPEG base64 (raw or data URL)"
     )
     # How the API returns the result
     return_mode: Literal["signed_url", "inline", "base64"] = "signed_url"
+
+class CoverScriptRequest(BaseModel):
+    title: str = Field(..., description="The chosen comic idea title")
+    synopsis: str = Field(..., description="The chosen comic idea synopsis")
+    name: str = Field(..., description="Main character name")  # [User_Name]
+    gender: Optional[str] = Field(None, description="Main character gender")  # [User_Gender]
+    page_count: int = Field(..., description="Total page count")  # [Page_Count]
+    theme: str = Field(..., description="Core comic theme")  # [User_Theme]
+    user_answers_list: Dict[str, str] = Field(
+        default_factory=dict, description="Comedic Q&A pairs (question → answer)"
+    )
+
+class CoverScriptResponse(BaseModel):
+    title: str = Field(..., description="A catchy and funny title for the comic")
+    tagline: str = Field(..., description="A hilarious subtitle or punchy quote")
+    cover_art_description: str = Field(
+        ...,
+        description=(
+            "A highly detailed description of a dynamic and exciting cover image. "
+            "Describe the character's pose, expression, the background, the mood, "
+            "and the central action. Like a 'movie poster' for the story."
+        )
+    )
+    story_summary: str = Field(
+        ...,
+        description=(
+            "A concise summary of the full story arc, 3–8 sentences long. "
+            "Expands on the chosen synopsis and sets the stage for the full script."
+        )
+    )

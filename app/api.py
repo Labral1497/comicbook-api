@@ -22,7 +22,10 @@ from app import (
     generate_full_script,
     GenerateCoverRequest,
     _decode_image_b64,
-    upload_to_gcs
+    upload_to_gcs,
+    CoverScriptRequest,
+    CoverScriptResponse,
+    generate_cover_script
 )
 api_prefix = "/api/v1"
 log = logger.get_logger(__name__)
@@ -140,6 +143,8 @@ async def generate_comic_cover_endpoint(
             user_theme=req.user_theme,
             output_path=out_path,
             image_ref_path=ref_path,
+            title=req.title,
+            tagline=req.tagline
         )
     except Exception as e:
         # log.exception("Cover generation failed")  # if you have logging set up
@@ -173,3 +178,8 @@ async def generate_full_script_endpoint(req: FullScriptRequest) -> FullScriptRes
         raise HTTPException(status_code=422, detail=f"Schema validation failed: {ve.errors()}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Full script generation failed: {e}")
+
+
+@app.post(api_prefix+"/generate/comic/cover-script", response_model=CoverScriptResponse)
+async def cover_script_endpoint(req: CoverScriptRequest) -> CoverScriptResponse:
+    return await generate_cover_script(req)
