@@ -1,0 +1,10 @@
+# app/features/full_script/router.py
+from fastapi import APIRouter
+from .schemas import FullScriptRequest, FullScriptResponse
+from .service import generate_full_script
+
+router = APIRouter(prefix="/api/v1", tags=["full-script"])
+
+@router.post("/generate/comic/full-script", response_model=FullScriptResponse)
+async def full_script_endpoint(req: FullScriptRequest) -> FullScriptResponse:
+    return await generate_full_script(req)

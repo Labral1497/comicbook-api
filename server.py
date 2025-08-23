@@ -1,5 +1,5 @@
 # server.py (repo root)
-from app.api import app  # <-- import your FastAPI instance from app/api.py
+from app.main import app
 
 # Optional local run:
 if __name__ == "__main__":
