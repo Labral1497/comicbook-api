@@ -10,7 +10,9 @@ from .schemas import GenerateCoverRequest
 from .service import generate_comic_cover
 from app.config import config
 from app.lib.fs import make_job_dir
+from app.logger import get_logger
 
+log = get_logger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["cover"])
 
 @router.post("/generate/comic/cover")
@@ -22,24 +24,10 @@ async def cover_endpoint(req: GenerateCoverRequest, background_tasks: Background
     if not config.keep_outputs:
         background_tasks.add_task(shutil.rmtree, str(workdir), ignore_errors=True)
 
-    # Optional image save
-    ref_path = None
-    if req.image_base64:
-        try:
-            data, ctype = _decode_image_b64(req.image_base64)
-        except Exception as e:
-            raise HTTPException(400, f"Invalid image_base64: {e}")
-        if ctype not in {"image/png", "image/jpeg"}:
-            raise HTTPException(400, "image must be PNG or JPEG")
-        ref_path = os.path.join(workdir, "cover_ref.png")
-        # Always normalize to PNG for downstream tools
-        with open(ref_path, "wb") as f:
-            f.write(data)
-
     # Generate cover
     out_path = os.path.join(workdir, "cover.png")
     try:
-        generate_comic_cover(req=req, out_path=out_path)
+        generate_comic_cover(req=req, out_path=out_path, workdir=workdir)
     except Exception as e:
         # log.exception("Cover generation failed")  # if you have logging set up
         raise HTTPException(500, f"Cover generation failed: {e}")
