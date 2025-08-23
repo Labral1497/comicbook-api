@@ -39,14 +39,7 @@ async def cover_endpoint(req: GenerateCoverRequest, background_tasks: Background
     # Generate cover
     out_path = os.path.join(workdir, "cover.png")
     try:
-        generate_comic_cover(
-            cover_art_description=req.cover_art_description,
-            user_theme=req.user_theme,
-            output_path=out_path,
-            image_ref_path=ref_path,
-            title=req.title,
-            tagline=req.tagline
-        )
+        generate_comic_cover(req=req, out_path=out_path)
     except Exception as e:
         # log.exception("Cover generation failed")  # if you have logging set up
         raise HTTPException(500, f"Cover generation failed: {e}")

@@ -1,11 +1,51 @@
+# Python junk
 __pycache__/
-*.pyc
+**/__pycache__/
+*.py[cod]
 *.pyo
 *.pyd
-*.DS_Store
-.env
+*.so
+*.dist-info/
+*.egg-info/
+
+# Venvs
 .venv/
-.envrc
+env/
+venv/
+
+# Build/test artifacts
+build/
+dist/
+.eggs/
+.coverage*
+.pytest_cache/
+htmlcov/
+.mypy_cache/
+.cache/
+
+# Git/IDE
 .git/
 .gitignore
-tests/
+.gitattributes
+.vscode/
+.idea/
+.DS_Store
+
+# Local env
+.env
+.env.*
+*.env
+
+# Generated/media
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.zip
+*.tar
+*.tar.gz
+*.tmp
+tmp/
+data/
+outputs/
+artifacts/
