@@ -5,7 +5,7 @@ import shutil
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 
-from app.lib.gcs_inventory import _decode_image_b64, upload_to_gcs
+from app.lib.gcs_inventory import upload_to_gcs
 from .schemas import GenerateCoverRequest
 from .service import generate_comic_cover
 from app.config import config
@@ -34,6 +34,7 @@ async def cover_endpoint(req: GenerateCoverRequest, background_tasks: Background
     # log.debug("koko3")
     mode = req.return_mode
     if mode == "inline":
+        log.debug(f"out_path is: {out_path}")
         return FileResponse(out_path, media_type="image/png", filename="comic_cover.png")
     elif mode == "base64":
         # log.debug("koko3")

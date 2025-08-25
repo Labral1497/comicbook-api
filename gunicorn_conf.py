@@ -8,11 +8,11 @@ worker_class = "uvicorn.workers.UvicornWorker"
 workers = int(os.getenv("WEB_CONCURRENCY", "2"))
 
 # אפשר להשאיר threads=1 כשאתה async; העלה רק אם יש קוד blocking קטן
-threads = int(os.getenv("WEB_THREADS", "1"))
+threads = int(os.getenv("WEB_THREADS", "2"))
 
 # זמנים
-timeout = int(os.getenv("WEB_TIMEOUT", "120"))           # hard timeout לבקשה
-graceful_timeout = int(os.getenv("WEB_GRACEFUL", "30"))  # זמן לסגירה עדינה
+timeout = int(os.getenv("WEB_TIMEOUT", "300"))           # hard timeout לבקשה
+graceful_timeout = int(os.getenv("WEB_GRACEFUL", "60"))  # זמן לסגירה עדינה
 keepalive = 5
 
 # הגנות מזליגת זיכרון: ריסטארט worker אחרי X בקשות

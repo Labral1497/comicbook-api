@@ -71,7 +71,7 @@ class ScriptPage(BaseModel):
     page_number: int
     panels: List[ScriptPanel]
 
-class FullScriptResponse(BaseModel):
+class FullScriptPagesResponse(BaseModel):
     title: str
     tagline: str
     cover_art_description: str

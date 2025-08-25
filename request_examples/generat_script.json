@@ -1,12 +1,15 @@
 {
-  "title": "",
-  "synopsis": "A founder launches an AI comics platform; each demo turns into a chaotic live show.",
+  "title": "Debugged Dreams",
+  "tagline": "When every fix spawns ten new bugs!",
+  "story_summary": "A founder launches an AI comics platform; each demo spirals into chaos, turning routine debugging into slapstick comedy and ending in a hilariously triumphant product launch.",
   "user_name": "Roey",
   "user_gender": "Male",
-  "character_description": "30s, techwear hoodie, expressive eyebrows, short dark hair.",
   "page_count": 6,
   "user_theme": "Tech entrepreneur comedy",
-  "user_answers_list": ["self-deprecating humor", "debugging mishaps"],
+  "user_answers_list": {
+    "What is Roey's comedic style?": "self-deprecating humor",
+    "What situation always gets him stuck?": "debugging mishaps"
+  },
   "min_panels_per_page": 4,
   "max_panels_per_page": 6
 }

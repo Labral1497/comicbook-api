@@ -1,6 +1,6 @@
 # tests/test_pages_endpoints.py
 import json
-from app.features.full_script.schemas import FullScriptResponse, Page, Panel
+from app.features.full_script.schemas import FullScriptPagesResponse, Page, Panel
 
 def _make_full_script_payload():
     return {

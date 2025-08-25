@@ -76,26 +76,3 @@ def upload_to_gcs(local_path: str, *, subdir: str = "covers") -> dict:
         "expires_in": config.signed_url_ttl,
         "content_type": "image/png",
     }
-
-def _decode_image_b64(image_b64: str) -> tuple[bytes, str]:
-    """
-    Returns (bytes, content_type). Supports 'data:image/png;base64,...' or raw base64.
-    Only PNG and JPEG are accepted.
-    """
-    if not image_b64:
-        raise ValueError("empty base64")
-    m = _DATAURL_RE.match(image_b64.strip())
-    if m:
-        content_type = m.group(1).lower()
-        payload = m.group(2)
-        data = base64.b64decode(payload)
-    else:
-        # Try raw base64; sniff magic to decide content type
-        data = base64.b64decode(image_b64.strip())
-        if data.startswith(b"\x89PNG\r\n\x1a\n"):
-            content_type = "image/png"
-        elif data.startswith(b"\xff\xd8"):
-            content_type = "image/jpeg"
-        else:
-            raise ValueError("Unsupported image format; only PNG or JPEG")
-    return data, content_type

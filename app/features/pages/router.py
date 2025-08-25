@@ -11,6 +11,8 @@ from app import logger
 from app.features.pages.schemas import ComicRequest
 from app.features.pages.service import build_page_prompts, render_pages_from_prompts
 from app.lib.fs import make_job_dir
+from app.lib.gcs_inventory import upload_to_gcs
+from app.lib.imaging import maybe_decode_image_to_path
 from app.lib.pdf import make_pdf
 
 router = APIRouter(prefix="/api/v1", tags=["comic"])
@@ -19,8 +21,7 @@ log = logger.get_logger(__name__)
 @router.post("/generate/comic")
 async def generate_comic(
     background_tasks: BackgroundTasks,
-    payload: str = Form(...),            # JSON string for ComicRequest
-    image: UploadFile = File(None),      # optional file upload
+    req: ComicRequest,
 ):
     workdir = make_job_dir()
     log.info(f"Working directory created: {workdir}")
@@ -29,37 +30,59 @@ async def generate_comic(
     if not config.keep_outputs:
         background_tasks.add_task(shutil.rmtree, workdir, ignore_errors=True)
 
-    # Parse & validate JSON payload
-    try:
-        req = ComicRequest(**json.loads(payload))
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Invalid payload JSON: {e}")
-
-    # Save uploaded image if present
-    ref_path = None
-    if image:
-        if image.content_type not in {"image/png", "image/jpeg"}:
-            log.error("Invalid image format")
-            raise HTTPException(status_code=400, detail="image must be PNG or JPEG")
-        ref_path = os.path.join(workdir, "ref.png")
-        with open(ref_path, "wb") as f:
-            f.write(await image.read())
-        log.info(f"Reference image saved at: {ref_path}")
-
     # Build page prompts (mirrors your original logic)
-    prepared_prompts = build_page_prompts(req, ref_path=ref_path)
+    image_ref_path = maybe_decode_image_to_path(req.image_ref, workdir)
+
+    prepared_prompts = build_page_prompts(req)
 
     # Generate images
-    files = render_pages_from_prompts(prepared_prompts, workdir=workdir)
+    files = render_pages_from_prompts(prepared_prompts, workdir=workdir, image_ref=image_ref_path)
     if not files:
         raise HTTPException(status_code=500, detail="no pages were generated")
 
-    # Return PDF or ZIP
+    # Decide which artifact to build
     if req.return_pdf:
-        pdf_name = os.path.join(workdir, f"comic_{uuid.uuid4().hex}.pdf")
-        make_pdf(files, pdf_name=pdf_name)
-        return FileResponse(pdf_name, media_type="application/pdf", filename="comic.pdf")
+        out_path = os.path.join(workdir, f"comic_{uuid.uuid4().hex}.pdf")
+        make_pdf(files, pdf_name=out_path)
+        mime = "application/pdf"
+        download_name = "comic.pdf"
+    else:
+        zip_base = os.path.join(workdir, "pages")
+        shutil.make_archive(zip_base, "zip", workdir)
+        out_path = f"{zip_base}.zip"
+        mime = "application/zip"
+        download_name = "comic_pages.zip"
 
-    zip_base = os.path.join(workdir, "pages")
-    shutil.make_archive(zip_base, "zip", workdir)
-    return FileResponse(f"{zip_base}.zip", media_type="application/zip", filename="comic_pages.zip")
+    # Now return by mode
+    mode = req.return_mode
+    if mode == "inline":
+        return FileResponse(out_path, media_type=mime, filename=download_name)
+
+    elif mode == "base64":
+        with open(out_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        return {
+            "mime": mime,
+            "base64": b64,
+            "meta": {
+                "comic_title": req.comic_title,
+                "style": req.style,
+                "pages": len(req.pages),
+                "artifact": "pdf" if req.return_pdf else "zip",
+            },
+        }
+
+    elif mode == "signed_url":
+        info = upload_to_gcs(out_path)  # requires GCS_BUCKET + service account
+        return {
+            "asset": info,  # whatever your upload_to_gcs returns (url, bucket, key, etc.)
+            "meta": {
+                "comic_title": req.comic_title,
+                "style": req.style,
+                "pages": len(req.pages),
+                "artifact": "pdf" if req.return_pdf else "zip",
+            },
+        }
+
+    else:
+        raise HTTPException(status_code=400, detail=f"unknown return_mode: {mode}")

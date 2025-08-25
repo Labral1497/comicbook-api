@@ -46,7 +46,7 @@ def load_config() -> Config:
         openai_image_model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1"),
         image_size=os.getenv("IMAGE_SIZE", "1024x1536"),
         allowed_origins=_env_csv("ALLOWED_ORIGINS", "*"),
-        keep_outputs=_env_bool("KEEP_OUTPUTS", True),
+        keep_outputs=_env_bool("KEEP_OUTPUTS", False),
         base_output_dir=(Path(__file__).resolve().parent / "output"),
         max_workers=int(os.getenv("MAX_WORKERS", "4")),
         log_level=os.getenv("LOG_LEVEL", "DEBUG"),
