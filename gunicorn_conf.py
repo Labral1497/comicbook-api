@@ -5,14 +5,10 @@ bind = f"0.0.0.0:{os.getenv('PORT', '8080')}"
 worker_class = "uvicorn.workers.UvicornWorker"
 
 # כמה workers? כלל אצבע: (CPU cores * 2) או 2–4 להתחלה
-workers = int(os.getenv("WEB_CONCURRENCY", "2"))
-
-# אפשר להשאיר threads=1 כשאתה async; העלה רק אם יש קוד blocking קטן
-threads = int(os.getenv("WEB_THREADS", "2"))
-
-# זמנים
-timeout = int(os.getenv("WEB_TIMEOUT", "300"))           # hard timeout לבקשה
-graceful_timeout = int(os.getenv("WEB_GRACEFUL", "60"))  # זמן לסגירה עדינה
+workers = 2
+threads = 2
+timeout = 600            # allow long requests
+graceful_timeout = 120
 keepalive = 5
 
 # הגנות מזליגת זיכרון: ריסטארט worker אחרי X בקשות
