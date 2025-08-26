@@ -3,6 +3,7 @@ PROJECT_ID ?= ai-comic-books
 REGION     ?= us-central1
 REPO       ?= comics-repo
 SERVICE    ?= comics-api
+TASKS_QUEUE ?= comic-worker-queue
 
 # GCS bucket for generated assets (override with: make ... BUCKET=my-bucket)
 BUCKET     ?= ai-comic-books-assets
@@ -22,8 +23,8 @@ DEPLOY_FLAGS = --region $(REGION) \
   --service-account $(SERVICE_SA) \
   --cpu 2 --memory 1Gi --concurrency 80 \
   --min-instances 0 --max-instances 50 \
-  --timeout 600 --port 8080 \
-  --set-env-vars API_PREFIX=/api/v1,KEEP_OUTPUTS=false,GCS_BUCKET=$(BUCKET),GCS_SIGNED_URL_TTL=$(GCS_SIGNED_URL_TTL),GCS_SIGNING_SERVICE_ACCOUNT=$(GCS_SIGNING_SERVICE_ACCOUNT) \
+  --timeout 1200 --port 8080 \
+  --set-env-vars API_PREFIX=/api/v1,KEEP_OUTPUTS=false,USE_CLOUD_TASKS=true,TASKS_QUEUE=$(TASKS_QUEUE),GCS_BUCKET=$(BUCKET),GCS_SIGNED_URL_TTL=$(GCS_SIGNED_URL_TTL),GCS_SIGNING_SERVICE_ACCOUNT=$(GCS_SIGNING_SERVICE_ACCOUNT) \
   --set-secrets OPENAI_API_KEY=OPENAI_API_KEY:latest
 
 
@@ -125,3 +126,14 @@ set-bucket-env:
 gcs-status:
 	gcloud storage buckets describe gs://$(BUCKET) --format='yaml(location,iamConfiguration,labels,metageneration)'
 	gcloud storage buckets get-iam-policy gs://$(BUCKET) --format='table(bindings.role,bindings.members)'
+
+ensure-tasks-queue:
+	gcloud services enable cloudtasks.googleapis.com
+	- gcloud tasks queues create $(TASKS_QUEUE) \
+	    --project $(PROJECT_ID) \
+	    --location $(REGION) || true
+
+tasks-iam:
+	gcloud projects add-iam-policy-binding $(PROJECT_ID) \
+	  --member="serviceAccount:$(SERVICE_SA)" \
+	  --role="roles/cloudtasks.enqueuer"
