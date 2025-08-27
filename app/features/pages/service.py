@@ -10,7 +10,7 @@ from app.features.full_script.schemas import Page, Panel
 from app.logger import get_logger
 from app.lib.openai_client import client
 from app.lib.gcs_inventory import upload_to_gcs
-from app.lib.jobs import mark_page_status
+from app.lib.jobs import load_manifest, mark_page_status
 from app.features.pages.schemas import ComicRequest
 
 
@@ -61,6 +61,10 @@ def render_pages_chained(
     prev_ref = cover_image_ref
 
     for idx, page in enumerate(req.pages):
+        mf = load_manifest(manifest_file)
+        if mf.get("cancelled"):
+            log.info(f"[job cancelled] stopping at page {idx+1}")
+            break
         page_no = idx + 1
         prompt = _build_page_prompt(req, page)
 

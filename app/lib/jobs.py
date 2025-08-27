@@ -79,3 +79,14 @@ def prune_job_dir(
     except Exception:
         # best-effort; don't crash the job on cleanup
         pass
+
+
+def set_cancelled(manifest_file: str, cancelled: bool = True) -> None:
+    mf = load_manifest(manifest_file)
+    mf["cancelled"] = bool(cancelled)
+    save_manifest(manifest_file, mf)
+
+def set_task_name(manifest_file: str, task_name: str) -> None:
+    mf = load_manifest(manifest_file)
+    mf["task_name"] = task_name
+    save_manifest(manifest_file, mf)

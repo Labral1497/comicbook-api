@@ -20,8 +20,10 @@ from app.lib.jobs import (
     save_manifest,
     pages_done,
     seed_manifest_pending,
+    set_cancelled,
+    set_task_name,
 )
-from app.lib.cloud_tasks import create_task
+from app.lib.cloud_tasks import create_task, delete_task
 from app.lib.imaging import resolve_or_download_cover_ref
 from app.lib.gcs_inventory import download_gcs_object_to_file, upload_json_to_gcs, upload_to_gcs
 from app.lib.pdf import make_pdf
@@ -48,7 +50,12 @@ async def enqueue_comic_job(req: ComicRequest) -> dict:
         json.dump(req.model_dump(), f, indent=2)
 
     # seed manifest with pending pages
-    seed_manifest_pending(manifest_path(workdir), total_pages=len(req.pages))
+    mf_path = manifest_path(workdir)
+    mf = load_manifest(mf_path)
+    if mf.get("cancelled"):
+        log.info(f"[{job_id}] already cancelled; acking")
+        return JSONResponse({"job_id": job_id, "ok": True, "cancelled": True})
+    seed_manifest_pending(mf_path, total_pages=len(req.pages))
 
     # upload request.json to GCS (source of truth for worker)
     req_info = upload_json_to_gcs(
@@ -59,7 +66,7 @@ async def enqueue_comic_job(req: ComicRequest) -> dict:
 
     # enqueue Cloud Task (fire and forget)
     task_url = f"{config.public_base_url}/api/v1/tasks/worker/comic/{job_id}"
-    create_task(
+    resp = create_task(
         queue=config.tasks_queue,
         url=task_url,
         payload={"job_id": job_id, "request_gcs": req_info["gs_uri"]},
@@ -67,6 +74,7 @@ async def enqueue_comic_job(req: ComicRequest) -> dict:
     )
     log.debug(f"created cloud task for job {job_id}")
 
+    set_task_name(mf_path, resp.name)
     return {
         "job_id": job_id,
         "status_url": f"/api/v1/generate/comic/status/{job_id}",
@@ -115,7 +123,7 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
     total_pages = len(req.pages)
 
     # render sequentially
-    files = render_pages_chained(
+    render_pages_chained(
         req=req,
         workdir=workdir,
         cover_image_ref=cover_ref_path,
@@ -163,3 +171,34 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
             log.warning(f"failed to prune {workdir}: {e}")
 
     return JSONResponse({"job_id": job_id, "ok": True})
+
+@router.post("/generate/comic/stop/{job_id}")
+async def stop_comic_job(job_id: str) -> dict:
+    workdir = job_dir(job_id)
+    mf_path = manifest_path(workdir)
+    if not os.path.exists(mf_path):
+        raise HTTPException(404, f"unknown job_id {job_id}")
+
+    mf = load_manifest(mf_path)
+
+    # 1) mark as cancelled so a running worker can bail out safely
+    set_cancelled(mf_path, True)
+
+    # 2) try to delete pending Cloud Task (noop if it's already running/handled)
+    deleted = False
+    task_name = mf.get("task_name")
+    if task_name:
+        try:
+            deleted = delete_task(
+                project=config.gcp_project,
+                location=config.gcp_location,
+                queue=config.tasks_queue,
+                task_name=task_name,
+            )
+        except Exception:
+            # don't fail the endpoint if delete fails; worker will see "cancelled"
+            deleted = False
+    mf["final"] = {"status": "cancelled"}
+    save_manifest(mf_path, mf)
+
+    return {"job_id": job_id, "cancelled": True, "queued_task_deleted": deleted}
