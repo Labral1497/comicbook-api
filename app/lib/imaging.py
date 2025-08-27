@@ -14,56 +14,82 @@ from app.lib.openai_client import client as _client
 
 log = logger.get_logger(__name__)
 
-def _is_data_url(s: str) -> bool:
-    return s.startswith("data:image/") and ";base64," in s
+def _sniff_ext_from_bytes(data: bytes) -> str:
+    # PNG
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    # JPEG
+    if data.startswith(b"\xff\xd8"):
+        return ".jpg"
+    # GIF87a / GIF89a
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return ".gif"
+    # WEBP: RIFF....WEBP
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp"
+    return ""  # unknown
 
+def _is_data_url(s: str) -> bool:
+    # accept any data:*;base64, not only data:image/*
+    return s.startswith("data:") and ";base64," in s
 
 def _decode_data_url_to_file(data_url: str, out_path: str) -> str:
+    # data:[MIME];base64,<payload>
     header, b64 = data_url.split(",", 1)
-    mime = header.split(";")[0].split(":", 1)[1]  # e.g. image/png
+    # MIME can be image/png, application/octet-stream, etc.
+    # We won’t fully trust MIME—will sniff bytes too.
     data = base64.b64decode(b64)
-    # normalize extension by mime
-    ext = ".png" if mime.endswith("png") else ".jpg"
+
+    # Try to decide extension by sniffing bytes first
+    ext = _sniff_ext_from_bytes(data)
+    if not ext:
+        # If sniffing failed, map a few common mimes, else .bin
+        mime = header.split(";", 1)[0].split(":", 1)[1].lower()  # e.g. image/png
+        if mime.endswith("png"):
+            ext = ".png"
+        elif mime.endswith("jpeg") or mime.endswith("jpg"):
+            ext = ".jpg"
+        elif mime.endswith("gif"):
+            ext = ".gif"
+        elif mime.endswith("webp"):
+            ext = ".webp"
+        else:
+            # last resort: assume PNG for octet-stream if it decodes fine?
+            # safer default is .bin; choose .png if you know your producer is always PNG
+            ext = ".png" if mime == "application/octet-stream" else ".bin"
+
     base, _ = os.path.splitext(out_path)
     out_file = base + ext
     with open(out_file, "wb") as f:
         f.write(data)
     return out_file
 
-
 def _looks_like_raw_base64(s: str) -> bool:
-    # cheap heuristic: long string, base64 charset, divisible by 4 length
+    # keep your heuristic but allow whitespace
     if len(s) < 200:
         return False
-    if len(s) % 4 != 0:
+    # base64 payloads often not divisible by 4 due to stripping; be more forgiving
+    if not re.fullmatch(r"[A-Za-z0-9+/=\s]+", s):
         return False
-    return re.fullmatch(r"[A-Za-z0-9+/=\s]+", s) is not None
-
+    return True
 
 def _decode_raw_b64_to_file(b64: str, out_path: str) -> str:
     data = base64.b64decode(b64)
-    # assume PNG by default
-    if not out_path.lower().endswith(".png"):
-        out_path = out_path + ".png"
+    ext = _sniff_ext_from_bytes(data) or ".png"  # default to PNG if unknown
+    if not out_path.lower().endswith(ext):
+        out_path = out_path + ext
     with open(out_path, "wb") as f:
         f.write(data)
     return out_path
 
-
 def _copy_if_exists(path_or_url: str, out_path: str) -> Optional[str]:
-    """
-    If it's a local path that exists, copy it into job dir for stability.
-    URLs are left as-is (you can extend to download http(s)/gs:// if you want).
-    """
     if os.path.exists(path_or_url):
         _, ext = os.path.splitext(path_or_url)
-        if not out_path.endswith(ext):
+        if ext and not out_path.endswith(ext):
             out_path = out_path + ext
         shutil.copy2(path_or_url, out_path)
         return out_path
-    # TODO: support http(s) or gs:// download if needed
     return None
-
 
 def resolve_or_download_cover_ref(image_ref: Optional[str], workdir: str) -> Optional[str]:
     """
