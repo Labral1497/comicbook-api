@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
@@ -22,7 +23,7 @@ from app.lib.jobs import (
 )
 from app.lib.cloud_tasks import create_task
 from app.lib.imaging import resolve_or_download_cover_ref
-from app.lib.gcs_inventory import upload_to_gcs
+from app.lib.gcs_inventory import download_gcs_object_to_file, upload_json_to_gcs, upload_to_gcs
 from app.lib.pdf import make_pdf
 from app.features.pages.service import render_pages_chained
 
@@ -34,84 +35,69 @@ log = get_logger(__name__)
 async def enqueue_comic_job(req: ComicRequest) -> dict:
     """
     Public endpoint. Fire-and-forget.
-    Creates job dir, persists request.json and empty manifest,
-    enqueues a Cloud Task to /api/v1/tasks/worker/comic/{job_id}.
+    Creates job dir, persists request.json + manifest,
+    uploads request.json to GCS, and enqueues a Cloud Task
+    to /api/v1/tasks/worker/comic/{job_id}.
     """
-    log.info(f"genrating comic {req.comic_title}")
+    log.info(f"enqueueing comic job for {req.comic_title}")
     job_id, workdir = make_job_dir_with_id()
 
-    # persist request
-    with open(os.path.join(workdir, "request.json"), "w") as f:
+    # persist locally for debugging / resume
+    req_path = os.path.join(workdir, "request.json")
+    with open(req_path, "w") as f:
         json.dump(req.model_dump(), f, indent=2)
 
-    # seed manifest (all pages pending, no final)
+    # seed manifest with pending pages
     seed_manifest_pending(manifest_path(workdir), total_pages=len(req.pages))
 
-    # enqueue Cloud Task to run the heavy job
+    # upload request.json to GCS (source of truth for worker)
+    req_info = upload_json_to_gcs(
+        req.model_dump(),
+        object_name=f"jobs/{job_id}/request.json",
+        subdir="jobs"
+    )
+
+    # enqueue Cloud Task (fire and forget)
     task_url = f"{config.public_base_url}/api/v1/tasks/worker/comic/{job_id}"
     create_task(
         queue=config.tasks_queue,
         url=task_url,
-        payload={"job_id": job_id},
+        payload={"job_id": job_id, "request_gcs": req_info["gs_uri"]},
         schedule_in_seconds=0,
     )
-    log.debug(f"created cloud task with job id: {job_id}")
+    log.debug(f"created cloud task for job {job_id}")
 
     return {
         "job_id": job_id,
         "status_url": f"/api/v1/generate/comic/status/{job_id}",
         "resume_url": f"/api/v1/generate/comic/resume/{job_id}",
-        "worker_url": f"/api/v1/tasks/worker/comic/{job_id}",  # for local testing
+        "worker_url": f"/api/v1/tasks/worker/comic/{job_id}",  # local testing
     }
-
-
-@router.get("/generate/comic/status/{job_id}")
-async def status(job_id: str) -> dict:
-    """Return manifest content (pages + final)."""
-    log.debug(f"Checked status on job id: {job_id}")
-    workdir = job_dir(job_id)
-    mf = load_manifest(manifest_path(workdir))
-    return mf
-
-
-@router.post("/generate/comic/resume/{job_id}", status_code=202)
-async def resume(job_id: str) -> dict:
-    """
-    Re-enqueue the job (idempotent). The worker will skip already-finished pages.
-    Useful if the job was interrupted, or GCS upload failed earlier.
-    """
-    log.debug(f"resumed cloud task with job id: {job_id}")
-    workdir = job_dir(job_id)
-    req_path = os.path.join(workdir, "request.json")
-    if not os.path.exists(req_path):
-        raise HTTPException(404, f"unknown job_id {job_id}")
-
-    task_url = f"{config.public_base_url}/api/v1/tasks/worker/comic/{job_id}"
-    create_task(
-        queue=config.tasks_queue,
-        url=task_url,
-        payload={"job_id": job_id},
-        schedule_in_seconds=0,
-    )
-    return {"job_id": job_id, "resumed": True}
-
-
 @router.post("/tasks/worker/comic/{job_id}")
 async def worker_process(job_id: str, request: Request) -> JSONResponse:
     """
-    Private worker endpoint (Cloud Tasks target).
-    - Recomputes which pages are missing (manifest-driven).
-    - Renders sequentially (page N references N-1) for continuity.
-    - Uploads each page on completion, updates manifest continuously.
-    - Builds and uploads final artifact when all pages exist.
-    This handler should be idempotent: safe to retry.
+    Cloud Tasks target.
+    Idempotent: safe to retry.
+    - Downloads request.json if missing
+    - Renders sequentially (page N references page N-1)
+    - Uploads each page to GCS and updates manifest
+    - Builds and uploads final artifact if all pages done
     """
-    # optional: validate Cloud Tasks signature/token here
-    log.debug(f"woekre process called for job id: {job_id}")
+    log.debug(f"worker process called for job id: {job_id}")
     workdir = job_dir(job_id)
+    os.makedirs(workdir, exist_ok=True)
+
+    # parse Cloud Task payload
+    body = await request.json()
+    request_gcs = body.get("request_gcs")
+
+    # ensure request.json exists locally
     req_path = os.path.join(workdir, "request.json")
     if not os.path.exists(req_path):
-        raise HTTPException(404, f"unknown job_id {job_id}")
+        if not request_gcs:
+            log.error(f"no request.json found for job {job_id} and no request_gcs in payload")
+            raise HTTPException(404, f"unknown job_id {job_id}")
+        download_gcs_object_to_file(request_gcs, req_path)
 
     # load request
     with open(req_path, "r") as f:
@@ -121,48 +107,43 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
     mf_path = manifest_path(workdir)
     mf = load_manifest(mf_path)
 
-    # resolve cover reference (file path)
+    # resolve cover image
     cover_ref_path = resolve_or_download_cover_ref(req.image_ref, workdir)
     if not cover_ref_path or not os.path.exists(cover_ref_path):
-        raise HTTPException(400, "Invalid or missing cover image reference (image_ref)")
+        raise HTTPException(400, "Invalid or missing cover image reference")
 
-    # determine which pages already exist so we don't re-do them
-    already_done = set(pages_done(mf))  # pages with status == 'done'
     total_pages = len(req.pages)
 
-    # run chained generation (page 1 uses cover; page N uses page N-1)
+    # render sequentially
     files = render_pages_chained(
         req=req,
         workdir=workdir,
         cover_image_ref=cover_ref_path,
-        manifest_file=mf_path,  # progress and status written as we go
+        manifest_file=mf_path,
         gcs_prefix=f"jobs/{job_id}",
     )
 
-    # collect locally existing pages in order
+    # collect all local pages
     local_files: List[str] = []
     for i in range(total_pages):
         p = os.path.join(workdir, f"page-{i+1}.png")
         if os.path.exists(p):
             local_files.append(p)
 
-    # if all exist, build+upload final
+    # finalize if all present
     if len(local_files) == total_pages and mf.get("final") is None:
-        # build PDF or ZIP
         if req.return_pdf:
             out_path = os.path.join(workdir, "comic.pdf")
             make_pdf(local_files, pdf_name=out_path)
             mime = "application/pdf"
             objname = f"jobs/{job_id}/comic.pdf"
         else:
-            import shutil
             zip_base = os.path.join(workdir, "pages")
             shutil.make_archive(zip_base, "zip", workdir)
             out_path = f"{zip_base}.zip"
             mime = "application/zip"
             objname = f"jobs/{job_id}/pages.zip"
 
-        # try upload, record in manifest
         try:
             info = upload_to_gcs(out_path, object_name=objname)
             mf["final"] = {"mime": mime, "gcs": info}
@@ -170,13 +151,15 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
             mf["final"] = {"mime": mime, "local": out_path, "upload_error": str(e)}
 
         save_manifest(mf_path, mf)
+
+        # cleanup if configured
         try:
             prune_job_dir(
                 workdir,
                 remove_pages=config.prune_pages_after_final,
                 remove_artifacts=config.prune_artifact_after_upload,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning(f"failed to prune {workdir}: {e}")
 
     return JSONResponse({"job_id": job_id, "ok": True})

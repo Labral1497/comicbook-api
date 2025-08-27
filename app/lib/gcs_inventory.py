@@ -1,6 +1,9 @@
 import base64
+import io
+import json
 import os
 import re
+from typing import Any, Dict, Tuple
 import uuid
 from datetime import timedelta
 from fastapi import HTTPException
@@ -47,32 +50,116 @@ def _signing_creds():
         lifetime=3600,
     )
 
-def upload_to_gcs(local_path: str, *, subdir: str = "covers") -> dict:
-    log.debug("koko0")
+def upload_to_gcs(local_path: str, *, object_name: str | None = None, subdir: str = "covers") -> dict:
     if not config.gcs_bucket:
-        log.debug("koko0.5")
         raise HTTPException(500, "GCS_BUCKET not configured")
+
     client = _client()
     bucket = client.bucket(config.gcs_bucket)
-    object_name = f"{subdir}/{uuid.uuid4().hex}.png"
+
+    if not object_name:
+        object_name = f"{subdir}/{uuid.uuid4().hex}.png"
+
     blob = bucket.blob(object_name)
-    blob.cache_control = "public, max-age=31536000"  # 1 year (tune as you like)
-    blob.upload_from_filename(local_path, content_type="image/png")
-    log.debug("koko1")
+    blob.cache_control = "public, max-age=31536000"
+    blob.upload_from_filename(local_path)
+
     signed_url = blob.generate_signed_url(
         version="v4",
         expiration=timedelta(seconds=config.signed_url_ttl),
         method="GET",
-        response_disposition='inline; filename="comic_cover.png"',
-        response_type="image/png",
+        response_disposition=f'inline; filename="{os.path.basename(local_path)}"',
+        response_type="application/octet-stream",
         credentials=_signing_creds(),
     )
-    log.debug("koko2")
+
     return {
         "bucket": config.gcs_bucket,
         "object": object_name,
         "gs_uri": f"gs://{config.gcs_bucket}/{object_name}",
         "signed_url": signed_url,
         "expires_in": config.signed_url_ttl,
-        "content_type": "image/png",
+        "content_type": "application/octet-stream",
     }
+
+_GS_RE = re.compile(r"^gs://([^/]+)/(.+)$")
+
+def _parse_gs_uri(gs_uri: str) -> Tuple[str, str]:
+    """
+    Parse 'gs://bucket/key' -> (bucket, key)
+    """
+    m = _GS_RE.match(gs_uri)
+    if not m:
+        raise ValueError(f"Invalid gs:// URI: {gs_uri}")
+    return m.group(1), m.group(2)
+
+def upload_json_to_gcs(
+    data: Any,
+    *,
+    object_name: str | None = None,
+    subdir: str = "jobs",
+    filename_hint: str = "request.json",
+    cache_control: str = "no-cache",
+    make_signed_url: bool = True,
+) -> Dict[str, Any]:
+    """
+    Serialize `data` to JSON and upload to GCS. If `object_name` is None,
+    a name will be generated under `subdir` as <uuid>/<filename_hint>.
+
+    Returns a dict with bucket/object/gs_uri and optional signed_url.
+    """
+    if not config.gcs_bucket:
+        raise HTTPException(500, "GCS_BUCKET not configured")
+
+    client = _client()
+    bucket = client.bucket(config.gcs_bucket)
+
+    if object_name is None:
+        # e.g., jobs/<uuid>/request.json
+        object_name = f"{subdir}/{uuid.uuid4().hex}/{filename_hint}"
+
+    blob = bucket.blob(object_name)
+    blob.cache_control = cache_control
+
+    # Serialize to bytes (utf-8)
+    payload = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+    blob.upload_from_file(
+        io.BytesIO(payload),
+        size=len(payload),
+        content_type="application/json",
+    )
+
+    result: Dict[str, Any] = {
+        "bucket": config.gcs_bucket,
+        "object": object_name,
+        "gs_uri": f"gs://{config.gcs_bucket}/{object_name}",
+        "content_type": "application/json",
+    }
+
+    if make_signed_url:
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(seconds=config.signed_url_ttl),
+            method="GET",
+            response_disposition=f'inline; filename="{os.path.basename(filename_hint) or "file.json"}"',
+            response_type="application/json",
+            credentials=_signing_creds(),
+        )
+        result.update({"signed_url": signed_url, "expires_in": config.signed_url_ttl})
+
+    return result
+
+def download_gcs_object_to_file(gs_uri: str, dest_path: str) -> None:
+    """
+    Download a GCS object specified as 'gs://bucket/key' to a local file path.
+    Creates parent directories as needed.
+    """
+    bucket_name, object_name = _parse_gs_uri(gs_uri)
+
+    client = _client()
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(object_name)
+
+    os.makedirs(os.path.dirname(dest_path) or ".", exist_ok=True)
+    blob.download_to_filename(dest_path)

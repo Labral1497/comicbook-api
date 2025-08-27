@@ -24,7 +24,8 @@ def create_task(*, queue: str, url: str, payload: dict, schedule_in_seconds: int
             "url": url,
             "headers": {"Content-Type": "application/json"},
             "body": body,
-        }
+        },
+        "dispatch_deadline": {"seconds": 1800},
     }
 
     if schedule_in_seconds > 0:
