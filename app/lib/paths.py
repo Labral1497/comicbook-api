@@ -34,3 +34,8 @@ def manifest_path(workdir: str) -> str:
     Path to the manifest.json inside a job directory.
     """
     return str(Path(workdir) / "manifest.json")
+
+def ensure_job_dir(job_id: str) -> str:
+    workdir = os.path.join(data_dir(), "jobs", job_id)
+    os.makedirs(workdir, exist_ok=True)
+    return workdir

@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from app.config import config
 from app.logger import get_logger
 from app.features.pages.schemas import ComicRequest
-from app.lib.paths import make_job_dir_with_id, job_dir
+from app.lib.paths import ensure_job_dir, make_job_dir_with_id, job_dir
 from app.lib.jobs import (
     manifest_path,
     load_manifest,
@@ -42,7 +42,12 @@ async def enqueue_comic_job(req: ComicRequest) -> dict:
     to /api/v1/tasks/worker/comic/{job_id}.
     """
     log.info(f"enqueueing comic job for {req.comic_title}")
-    job_id, workdir = make_job_dir_with_id()
+    # 1) Resolve job_id
+    if req.job_id:
+        job_id = req.job_id
+        workdir = ensure_job_dir(job_id)  # creates if missing
+    else:
+        job_id, workdir = make_job_dir_with_id()
 
     # persist locally for debugging / resume
     req_path = os.path.join(workdir, "request.json")
@@ -81,6 +86,7 @@ async def enqueue_comic_job(req: ComicRequest) -> dict:
         "resume_url": f"/api/v1/generate/comic/resume/{job_id}",
         "worker_url": f"/api/v1/tasks/worker/comic/{job_id}",  # local testing
     }
+
 @router.post("/tasks/worker/comic/{job_id}")
 async def worker_process(job_id: str, request: Request) -> JSONResponse:
     """
@@ -94,6 +100,11 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
     log.debug(f"worker process called for job id: {job_id}")
     workdir = job_dir(job_id)
     os.makedirs(workdir, exist_ok=True)
+    mf_path = manifest_path(workdir)
+    mf = load_manifest(mf_path)
+    if mf.get("cancelled"):
+        log.info(f"[{job_id}] already cancelled; acking")
+        return JSONResponse({"job_id": job_id, "ok": True, "cancelled": True})
 
     # parse Cloud Task payload
     body = await request.json()
@@ -104,7 +115,7 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
     if not os.path.exists(req_path):
         if not request_gcs:
             log.error(f"no request.json found for job {job_id} and no request_gcs in payload")
-            raise HTTPException(404, f"unknown job_id {job_id}")
+            raise HTTPException(200, f"unknown job_id {job_id}")
         download_gcs_object_to_file(request_gcs, req_path)
 
     # load request
@@ -112,13 +123,10 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
         req_dict = json.load(f)
     req = ComicRequest(**req_dict)
 
-    mf_path = manifest_path(workdir)
-    mf = load_manifest(mf_path)
-
     # resolve cover image
     cover_ref_path = resolve_or_download_cover_ref(req.image_ref, workdir)
     if not cover_ref_path or not os.path.exists(cover_ref_path):
-        raise HTTPException(400, "Invalid or missing cover image reference")
+        raise HTTPException(200, "Invalid or missing cover image reference")
 
     total_pages = len(req.pages)
 

@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.features.full_script.schemas import Page
 
 class ComicRequest(BaseModel):
+    job_id: str
     comic_title: str
     style: str
     pages: List[Page]
