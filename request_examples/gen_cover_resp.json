@@ -1,0 +1,58 @@
+{
+    "job_id": "cebdc73f3afb4e9d8dcdaa6f29ae04ea",
+    "cover": {
+        "bucket": "ai-comic-books-assets",
+        "object": "jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/cover.png",
+        "gs_uri": "gs://ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/cover.png",
+        "signed_url": "https://storage.googleapis.com/ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/cover.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comics-api-sa%40ai-comic-books.iam.gserviceaccount.com%2F20250829%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20250829T220237Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&response-content-disposition=inline%3B%20filename%3D%22cover.png%22&response-content-type=application%2Foctet-stream&X-Goog-Signature=3695af9cfa1597e826346cb6acc3bfdf5ac8721eed1d6ceb6851c1246a6050793a3f21aeed6716e0bf3ab7182861f6c473894d3bf453b06924e19c2427aa6bbca9fce175437f751282bb12adfe898dd3c3ea567b9c238a5e89dc5873d4bb50f624630ea35b93e3387c1027ee1ec1e62ffc0638b3d9cb6065b41d5936a40d474435ab52eea90f4acd419632cca6ed7e5fc577140e911532a947fee79ea47b7dacfda12ca040e37a408d2777ea6d36e816baec1ced59c1dfd3bafc2f6732b856a9d530a70c5165f5d1862c771f3fdc633fa206ead069fdad06ab67f1103fceb49321e2b3ef2eb0723f9ea2ef07dd2f171442dc97e0962284a061dbb2f46d4e2bfd",
+        "expires_in": 3600,
+        "content_type": "application/octet-stream"
+    },
+    "cover_image_url": "https://storage.googleapis.com/ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/cover.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comics-api-sa%40ai-comic-books.iam.gserviceaccount.com%2F20250829%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20250829T220237Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&response-content-disposition=inline%3B%20filename%3D%22cover.png%22&response-content-type=application%2Foctet-stream&X-Goog-Signature=3695af9cfa1597e826346cb6acc3bfdf5ac8721eed1d6ceb6851c1246a6050793a3f21aeed6716e0bf3ab7182861f6c473894d3bf453b06924e19c2427aa6bbca9fce175437f751282bb12adfe898dd3c3ea567b9c238a5e89dc5873d4bb50f624630ea35b93e3387c1027ee1ec1e62ffc0638b3d9cb6065b41d5936a40d474435ab52eea90f4acd419632cca6ed7e5fc577140e911532a947fee79ea47b7dacfda12ca040e37a408d2777ea6d36e816baec1ced59c1dfd3bafc2f6732b856a9d530a70c5165f5d1862c771f3fdc633fa206ead069fdad06ab67f1103fceb49321e2b3ef2eb0723f9ea2ef07dd2f171442dc97e0962284a061dbb2f46d4e2bfd",
+    "cover_entities": {
+        "characters": [
+            "char_main",
+            "char_mike"
+        ],
+        "locations": [
+            "loc_burj_khalifa_rooftop"
+        ],
+        "props": [
+            "prop_wingsuit"
+        ],
+        "hints": {
+            "char_main": "Roey Levartovsky",
+            "char_mike": "Mike",
+            "loc_burj_khalifa_rooftop": "Burj Khalifa Rooftop",
+            "prop_wingsuit": "Wingsuit"
+        }
+    },
+    "seed_request": {
+        "job_id": "cebdc73f3afb4e9d8dcdaa6f29ae04ea",
+        "cover_image_url": "https://storage.googleapis.com/ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/cover.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comics-api-sa%40ai-comic-books.iam.gserviceaccount.com%2F20250829%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20250829T220237Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&response-content-disposition=inline%3B%20filename%3D%22cover.png%22&response-content-type=application%2Foctet-stream&X-Goog-Signature=3695af9cfa1597e826346cb6acc3bfdf5ac8721eed1d6ceb6851c1246a6050793a3f21aeed6716e0bf3ab7182861f6c473894d3bf453b06924e19c2427aa6bbca9fce175437f751282bb12adfe898dd3c3ea567b9c238a5e89dc5873d4bb50f624630ea35b93e3387c1027ee1ec1e62ffc0638b3d9cb6065b41d5936a40d474435ab52eea90f4acd419632cca6ed7e5fc577140e911532a947fee79ea47b7dacfda12ca040e37a408d2777ea6d36e816baec1ced59c1dfd3bafc2f6732b856a9d530a70c5165f5d1862c771f3fdc633fa206ead069fdad06ab67f1103fceb49321e2b3ef2eb0723f9ea2ef07dd2f171442dc97e0962284a061dbb2f46d4e2bfd",
+        "initial_ids": {
+            "characters": [
+                "char_main",
+                "char_mike"
+            ],
+            "locations": [
+                "loc_burj_khalifa_rooftop"
+            ],
+            "props": [
+                "prop_wingsuit"
+            ]
+        },
+        "hints": {
+            "char_main": "Roey Levartovsky",
+            "char_mike": "Mike",
+            "loc_burj_khalifa_rooftop": "Burj Khalifa Rooftop",
+            "prop_wingsuit": "Wingsuit"
+        }
+    },
+    "meta": {
+        "user_theme": "Pixar 3D animated cartoon style — Bright, polished, and highly expressive 3D cartoon look with cinematic warmth; friendly, emotive characters with slightly exaggerated heads, large expressive eyes, and rounded features; clear silhouettes, clean lines, and small memorable costume details; smooth shading with subtle fabric/skin/prop textures; vibrant harmonious colors with warm tones; soft cinematic lighting with occasional rim light, diffused shadows, and strong depth cues; stylized realistic environments—simplified for clarity, saturated foregrounds, softer backgrounds; warm, optimistic, family-friendly mood with strong visual appeal; bold, playful hand-lettered title and SFX. Maintain accurate likeness of the main character. No logos or trademarks",
+        "cover_art_description": "Roey, with a mischievous grin, is mid-leap in his vibrant wingsuit, soaring above the iconic Burj Khalifa. His expressive eyes sparkle with determination as he battles Mike, his mohawk-sporting nemesis, who is attempting a ridiculous stunt on a nearby rooftop. The scene is set with a warm sunset, casting a golden glow over the Dubai skyline, and a playful 'Whoosh!' sticker adds to the excitement.",
+        "title": "Wingsuit Warrior: High-Flying Hijinks",
+        "tagline": "Soar high, laugh hard!"
+    }
+}

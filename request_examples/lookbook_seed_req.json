@@ -1,0 +1,21 @@
+{
+    "job_id": "cebdc73f3afb4e9d8dcdaa6f29ae04ea",
+    "initial_ids": {
+      "characters": ["char_main","char_mike"],
+      "locations": ["loc_burj_khalifa_rooftop"],
+      "props": ["prop_wingsuit"]
+    },
+    "hints": {
+      "char_main": "Roey Levartovsky",
+      "char_mike": "Mike",
+      "loc_burj_khalifa_rooftop": "Burj Khalifa Rooftop",
+      "prop_wingsuit": "Wingsuit"
+    },
+    "notes": {
+      "char_main": "A dynamic stunt man with a dream of flying over the Burj Khalifa.",
+      "char_mike": "Roey’s competitive nemesis with a striking blonde mohawk.",
+      "loc_burj_khalifa_rooftop": "The breathtaking rooftop of the iconic Burj Khalifa.",
+      "prop_wingsuit": "A colorful wingsuit that highlights Roey’s adventurous spirit."
+    },
+    "user_theme": "Pixar 3D animated cartoon style — Bright, polished, and highly expressive 3D cartoon look with cinematic warmth; friendly, emotive characters with slightly exaggerated heads, large expressive eyes, and rounded features; clear silhouettes, clean lines, and small memorable costume details; smooth shading with subtle fabric/skin/prop textures; vibrant harmonious colors with warm tones; soft cinematic lighting with occasional rim light, diffused shadows, and strong depth cues; stylized realistic environments—simplified for clarity, saturated foregrounds, softer backgrounds; warm, optimistic, family-friendly mood with strong visual appeal; bold, playful hand-lettered title and SFX. Maintain accurate likeness of the main character. No logos or trademarks"
+}

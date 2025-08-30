@@ -1,0 +1,78 @@
+{
+    "job_id": "cebdc73f3afb4e9d8dcdaa6f29ae04ea",
+    "lookbook_upserts": {
+        "characters": [
+            {
+                "id": "char_main",
+                "display_name": "Roey Levartovsky",
+                "role": null,
+                "visual_canon": {
+                    "notes": "Seeded from cover; refine with concept sheet."
+                },
+                "reference_assets": [
+                    {
+                        "type": "cover",
+                        "url": "https://storage.googleapis.com/ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/cover.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comics-api-sa%40ai-comic-books.iam.gserviceaccount.com%2F20250829%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20250829T220237Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&response-content-disposition=inline%3B%20filename%3D%22cover.png%22&response-content-type=application%2Foctet-stream&X-Goog-Signature=3695af9cfa1597e826346cb6acc3bfdf5ac8721eed1d6ceb6851c1246a6050793a3f21aeed6716e0bf3ab7182861f6c473894d3bf453b06924e19c2427aa6bbca9fce175437f751282bb12adfe898dd3c3ea567b9c238a5e89dc5873d4bb50f624630ea35b93e3387c1027ee1ec1e62ffc0638b3d9cb6065b41d5936a40d474435ab52eea90f4acd419632cca6ed7e5fc577140e911532a947fee79ea47b7dacfda12ca040e37a408d2777ea6d36e816baec1ced59c1dfd3bafc2f6732b856a9d530a70c5165f5d1862c771f3fdc633fa206ead069fdad06ab67f1103fceb49321e2b3ef2eb0723f9ea2ef07dd2f171442dc97e0962284a061dbb2f46d4e2bfd"
+                    }
+                ],
+                "created_from": "cover_v1"
+            },
+            {
+                "id": "char_mike",
+                "display_name": "Mike",
+                "role": null,
+                "visual_canon": {
+                    "notes": "Seeded from cover; refine with concept sheet."
+                },
+                "reference_assets": [
+                    {
+                        "type": "cover",
+                        "url": "https://storage.googleapis.com/ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/cover.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comics-api-sa%40ai-comic-books.iam.gserviceaccount.com%2F20250829%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20250829T220237Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&response-content-disposition=inline%3B%20filename%3D%22cover.png%22&response-content-type=application%2Foctet-stream&X-Goog-Signature=3695af9cfa1597e826346cb6acc3bfdf5ac8721eed1d6ceb6851c1246a6050793a3f21aeed6716e0bf3ab7182861f6c473894d3bf453b06924e19c2427aa6bbca9fce175437f751282bb12adfe898dd3c3ea567b9c238a5e89dc5873d4bb50f624630ea35b93e3387c1027ee1ec1e62ffc0638b3d9cb6065b41d5936a40d474435ab52eea90f4acd419632cca6ed7e5fc577140e911532a947fee79ea47b7dacfda12ca040e37a408d2777ea6d36e816baec1ced59c1dfd3bafc2f6732b856a9d530a70c5165f5d1862c771f3fdc633fa206ead069fdad06ab67f1103fceb49321e2b3ef2eb0723f9ea2ef07dd2f171442dc97e0962284a061dbb2f46d4e2bfd"
+                    }
+                ],
+                "created_from": "cover_v1"
+            }
+        ],
+        "locations": [
+            {
+                "id": "loc_burj_khalifa_rooftop",
+                "name": "Burj Khalifa Rooftop",
+                "visual_canon": {
+                    "notes": "Seeded from cover; refine with concept sheet."
+                },
+                "reference_assets": [
+                    {
+                        "type": "cover",
+                        "url": "https://storage.googleapis.com/ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/cover.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comics-api-sa%40ai-comic-books.iam.gserviceaccount.com%2F20250829%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20250829T220237Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&response-content-disposition=inline%3B%20filename%3D%22cover.png%22&response-content-type=application%2Foctet-stream&X-Goog-Signature=3695af9cfa1597e826346cb6acc3bfdf5ac8721eed1d6ceb6851c1246a6050793a3f21aeed6716e0bf3ab7182861f6c473894d3bf453b06924e19c2427aa6bbca9fce175437f751282bb12adfe898dd3c3ea567b9c238a5e89dc5873d4bb50f624630ea35b93e3387c1027ee1ec1e62ffc0638b3d9cb6065b41d5936a40d474435ab52eea90f4acd419632cca6ed7e5fc577140e911532a947fee79ea47b7dacfda12ca040e37a408d2777ea6d36e816baec1ced59c1dfd3bafc2f6732b856a9d530a70c5165f5d1862c771f3fdc633fa206ead069fdad06ab67f1103fceb49321e2b3ef2eb0723f9ea2ef07dd2f171442dc97e0962284a061dbb2f46d4e2bfd"
+                    }
+                ],
+                "created_from": "cover_v1"
+            }
+        ],
+        "props": [
+            {
+                "id": "prop_wingsuit",
+                "name": "Wingsuit",
+                "visual_canon": {
+                    "notes": "Seeded from cover; refine with concept sheet."
+                },
+                "reference_assets": [
+                    {
+                        "type": "cover",
+                        "url": "https://storage.googleapis.com/ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/cover.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comics-api-sa%40ai-comic-books.iam.gserviceaccount.com%2F20250829%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20250829T220237Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&response-content-disposition=inline%3B%20filename%3D%22cover.png%22&response-content-type=application%2Foctet-stream&X-Goog-Signature=3695af9cfa1597e826346cb6acc3bfdf5ac8721eed1d6ceb6851c1246a6050793a3f21aeed6716e0bf3ab7182861f6c473894d3bf453b06924e19c2427aa6bbca9fce175437f751282bb12adfe898dd3c3ea567b9c238a5e89dc5873d4bb50f624630ea35b93e3387c1027ee1ec1e62ffc0638b3d9cb6065b41d5936a40d474435ab52eea90f4acd419632cca6ed7e5fc577140e911532a947fee79ea47b7dacfda12ca040e37a408d2777ea6d36e816baec1ced59c1dfd3bafc2f6732b856a9d530a70c5165f5d1862c771f3fdc633fa206ead069fdad06ab67f1103fceb49321e2b3ef2eb0723f9ea2ef07dd2f171442dc97e0962284a061dbb2f46d4e2bfd"
+                    }
+                ],
+                "created_from": "cover_v1"
+            }
+        ]
+    },
+    "lookbook_gcs": {
+        "bucket": "ai-comic-books-assets",
+        "object": "jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/lookbook.json",
+        "gs_uri": "gs://ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/lookbook.json",
+        "content_type": "application/json",
+        "public_url": null,
+        "signed_url": "https://storage.googleapis.com/ai-comic-books-assets/jobs/cebdc73f3afb4e9d8dcdaa6f29ae04ea/lookbook.json?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comics-api-sa%40ai-comic-books.iam.gserviceaccount.com%2F20250830%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20250830T100503Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&response-content-disposition=inline%3B%20filename%3D%22lookbook.json%22&response-content-type=application%2Fjson&X-Goog-Signature=b90d58e98248a4b3195794711a99a83d0b0d76454d90b076172b2572ebd6a9e76dee3cf1d086a8ef5303a54e45b25667893e8c65eeb8ce48f19f0d0f4249a4a8e0f962735a4e32b8dffd3b289d8cca8a2672b378d965d0b4a99a604bc7153ed6560b9db1ef967417faad458364021f168d51878154a25f2ca1b5c9fa5a79b4707c2086f69f133364a4bbf367109ee5b5a8ddea220b8a5258592f5eeba4659c2a215468b80f621f45df6528be5e04e4ca9bf421c1db8cdf2428ba12f29190a55e1dfb9a41e14ed87ceb36c1e0007dc1a572efa5d5a3f9315235fe28d89e6d4fa6e06d3954118742906e78686c37d6d66a575e873847a62ea795557f1748f1a0e5",
+        "expires_in": 3600
+    }
+}

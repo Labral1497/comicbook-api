@@ -1,18 +1,27 @@
-import base64
 import io
 import json
 import os
 import re
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 import uuid
 from datetime import timedelta
 from fastapi import HTTPException
 from google.cloud import storage
+from pydantic import BaseModel, Field
 from app.config import config
 from app import logger
 
 log = logger.get_logger(__name__)
 _DATAURL_RE = re.compile(r"^data:(image/(?:png|jpeg));base64,(.*)$", re.IGNORECASE)
+
+class GCSInfo(BaseModel):
+    bucket: str
+    object: str
+    gs_uri: str
+    content_type: Optional[str] = None
+    public_url: Optional[str] = None
+    signed_url: Optional[str] = None
+    expires_in: Optional[int] = Field(default=None, description="Seconds until expiry")
 
 _storage = None
 def _client():

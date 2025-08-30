@@ -104,10 +104,15 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
     mf = load_manifest(mf_path)
     if mf.get("cancelled"):
         log.info(f"[{job_id}] already cancelled; acking")
-        return JSONResponse({"job_id": job_id, "ok": True, "cancelled": True})
+        return JSONResponse({"job_id": job_id, "ok": True, "cancelled": True}, status_code=200)
 
     # parse Cloud Task payload
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        # Malformed body is a permanent caller error
+        raise HTTPException(status_code=400, detail="invalid JSON body")
+
     request_gcs = body.get("request_gcs")
 
     # ensure request.json exists locally
@@ -132,6 +137,7 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
 
     # render sequentially
     render_pages_chained(
+        job_id=job_id,
         req=req,
         workdir=workdir,
         cover_image_ref=cover_ref_path,

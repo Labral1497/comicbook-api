@@ -1,0 +1,50 @@
+{
+    "title": "Wingsuit Warrior: High-Flying Hijinks",
+    "tagline": "Soaring high, laughing harder!",
+    "cover_art_description": "Roey Levartovsky, a charismatic stunt man in a vibrant wingsuit, is captured mid-flight over the iconic Burj Khalifa, with the cityscape sprawling beneath him. His mohawk-sporting nemesis Mike is seen on a nearby rooftop, preparing for a daring stunt. The scene is filled with bright colors and dynamic poses, encapsulating their playful rivalry and the thrill of adventure.",
+    "story_summary": "Join Roey as he attempts to soar over the Burj Khalifa, facing off against his mohawk-sporting nemesis Mike in a series of outrageous stunts and laugh-out-loud misadventures.",
+    "cover_entities": {
+        "characters": [
+            "char_main",
+            "char_mike"
+        ],
+        "locations": [
+            "loc_burj_khalifa_rooftop"
+        ],
+        "props": [
+            "prop_wingsuit"
+        ],
+        "hints": {
+            "char_main": "Roey Levartovsky",
+            "char_mike": "Mike",
+            "loc_burj_khalifa_rooftop": "Burj Khalifa Rooftop",
+            "prop_wingsuit": "Wingsuit"
+        },
+        "notes": {
+            "char_main": "A dynamic stunt man with a dream of flying over the Burj Khalifa.",
+            "char_mike": "Roey's competitive nemesis with a striking blonde mohawk.",
+            "loc_burj_khalifa_rooftop": "The breathtaking rooftop of the iconic Burj Khalifa.",
+            "prop_wingsuit": "A colorful wingsuit that highlights Roey's adventurous spirit."
+        }
+    },
+    "seed_request_template": {
+        "initial_ids": {
+            "characters": [
+                "char_main",
+                "char_mike"
+            ],
+            "locations": [
+                "loc_burj_khalifa_rooftop"
+            ],
+            "props": [
+                "prop_wingsuit"
+            ]
+        },
+        "hints": {
+            "char_main": "Roey Levartovsky",
+            "char_mike": "Mike",
+            "loc_burj_khalifa_rooftop": "Burj Khalifa Rooftop",
+            "prop_wingsuit": "Wingsuit"
+        }
+    }
+}

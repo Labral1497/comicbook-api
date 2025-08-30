@@ -7,6 +7,94 @@ from .schemas import FullScriptRequest, FullScriptPagesResponse
 from .prompt import build_full_script_prompt
 
 def _full_script_json_schema() -> dict:
+    # ---- reusable pieces ----
+    string = {"type": "string"}
+    str_array = {"type": "array", "items": string}
+
+    # Panel schema (with optional ids)
+    panel_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "panel_number": {"type": "integer"},
+            "art_description": string,
+            "dialogue": string,
+            "narration": string,
+            "sfx": string,
+            # NEW optional fields:
+            "characters": str_array,
+            "props": str_array,
+            "location_id": string,
+        },
+        "required": ["panel_number", "art_description", "dialogue", "narration", "sfx"],
+    }
+
+    # Page schema (with optional ids)
+    page_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "page_number": {"type": "integer"},
+            "panels": {
+                "type": "array",
+                "minItems": 1,
+                "items": panel_schema,
+            },
+            # NEW optional fields:
+            "location_id": string,
+            "characters": str_array,
+            "props": str_array,
+        },
+        "required": ["page_number", "panels"],
+    }
+
+    # Lookbook delta stubs
+    character_to_add = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "id": string,
+            "display_name": string,
+            "role": string,
+            "visual_stub": string,
+            "needs_concept_sheet": {"type": "boolean"},
+        },
+        "required": ["id", "display_name", "needs_concept_sheet"],
+    }
+    location_to_add = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "id": string,
+            "name": string,
+            "visual_stub": string,
+            "needs_concept_sheet": {"type": "boolean"},
+        },
+        "required": ["id", "name", "needs_concept_sheet"],
+    }
+    prop_to_add = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "id": string,
+            "name": string,
+            "visual_stub": string,
+            "needs_concept_sheet": {"type": "boolean"},
+        },
+        "required": ["id", "name", "needs_concept_sheet"],
+    }
+
+    lookbook_delta_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "characters_to_add": {"type": "array", "items": character_to_add},
+            "locations_to_add": {"type": "array", "items": location_to_add},
+            "props_to_add": {"type": "array", "items": prop_to_add},
+        },
+        "required": [],
+    }
+
     return {
         "type": "object",
         "additionalProperties": False,
@@ -14,37 +102,10 @@ def _full_script_json_schema() -> dict:
             "pages": {
                 "type": "array",
                 "minItems": 1,
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "page_number": {"type": "integer"},
-                        "panels": {
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "panel_number": {"type": "integer"},
-                                    "art_description": {"type": "string"},
-                                    "dialogue": {"type": "string"},
-                                    "narration": {"type": "string"},
-                                    "sfx": {"type": "string"},
-                                },
-                                "required": [
-                                    "panel_number",
-                                    "art_description",
-                                    "dialogue",
-                                    "narration",
-                                    "sfx",
-                                ],
-                            },
-                        },
-                    },
-                    "required": ["page_number", "panels"],
-                },
-            }
+                "items": page_schema,
+            },
+            # NEW: let the writer declare new entities
+            "lookbook_delta": lookbook_delta_schema,
         },
         "required": ["pages"],
     }

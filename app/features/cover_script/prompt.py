@@ -1,30 +1,65 @@
-# app/features/cover_script/prompt.py
 def build_cover_script_prompt(*, title: str, synopsis: str, name: str,
                               gender: str | None, page_count: int,
                               theme: str, traits: str) -> str:
   return f"""
-You are an elite-level comic book writer and storyboard artist, a creative fusion of a master storyteller known for wit and charm, and a film director known for brilliant visual comedy. Your task is to write a concept for a hilarious and visually rich comic book, formatted as a single, clean JSON object.
+You are an elite comic writer + storyboard artist. Output ONLY one JSON object matching the schema below.
 
-CONTEXT & INPUTS:
-Story Synopsis to Adapt: "title": "{title}", "synopsis": "{synopsis}"
-Main Character Name: "{name}"
-Main Character Gender: "{gender or "unspecified"}"
-Total Page Count: "{page_count}"
-Core Theme: "{theme}"
-Character's Comedic Traits (Source material for jokes, use them creatively): "{traits}"
+CONTEXT INPUTS:
+- Title: "{title}"
+- Synopsis: "{synopsis}"
+- Main Character Name: "{name}"
+- Main Character Gender: "{gender or "unspecified"}"
+- Total Page Count: {page_count}
+- Visual Theme / Style: "{theme}"
+- Q&A (free-form details you may mine for names/roles/locations/props/quirks):
+  {traits or "(none)"}
 
-PRIMARY DIRECTIVE:
-Generate a comic book cover concept and a concise story summary that expands upon the chosen synopsis. The script must be returned as a single JSON object, adhering strictly to the schema and creative mandates outlined below.
+GOALS:
+1) Propose an exciting cover concept and a concise story summary.
+2) Extract the initial Lookbook entities that are visible or implied by the **cover_art_description** you propose and by the Q&A/synopsis.
 
-CREATIVE MANDATES & RULE:
-Character Appearance: Do not add any facial accessories like masks or glasses to the main character in the cover_art_description, or anything that might damage their resemblance to the source photo.
+ENTITY & ID RULES (MANDATORY):
+- Use STABLE IDS built from human-readable names you actually mention:
+  - Characters: "char_<slug>" (the main character MUST be "char_main")
+  - Locations:  "loc_<slug>"
+  - Props:      "prop_<slug>"
+- Slugging: lowercase; words joined by underscores; ASCII; strip punctuation; no spaces; e.g.:
+  "Mike" -> "char_mike"
+  "Burj Khalifa Rooftop" -> "loc_burj_khalifa_rooftop"
+  "Wingsuit" -> "prop_wingsuit"
+- **Do NOT** output generic placeholders like "char_support_1", "loc_rooftop", "prop_laptop" unless those exact generic things are literally what your description uses.
+- The "hints" map must give display names for every ID (e.g., {{"char_main":"{name}"}}). Names should match your description.
+- Include an optional "notes" map with 1–2 sentence visual descriptors per ID (derived from Q&A/synopsis/description).
+- Keep seeding modest: protagonist always, plus at most 2 more characters, 1 location, up to 2 props.
 
-JSON SCHEMA (Your entire output MUST be a single JSON object that follows this exact structure):
-
+STRICT JSON SHAPE (exact keys; fill with your derived values):
 {{
-  "title": "A Catchy and Funny Title for the Comic",
-  "tagline": "A Hilarious Subtitle or Punchy Quote",
-  "cover_art_description": "A highly detailed description of a dynamic and exciting cover image. Describe the character's pose, expression, the background, the mood, a hilarious flashy sticker and the central action. This should be like a 'movie poster' for the story.",
-  "story_summary": "A concise summary of the full story arc, from beginning to end, in a single paragraph of 3-8 sentences. This summary must expand on the chosen synopsis and will be used later to write the full comic book script."
+  "title": "...",
+  "tagline": "...",
+  "cover_art_description": "...",
+  "story_summary": "...",
+  "cover_entities": {{
+    "characters": ["char_main", "<char_slug_if_any>"],
+    "locations": ["<loc_slug_if_any>"],
+    "props": ["<prop_slug_if_any>"],
+    "hints": {{
+      "char_main": "{name}"
+      // add display names for every other id you emit
+    }},
+    "notes": {{
+      // optional: id -> 1–2 sentences on look/role
+    }}
+  }},
+  "seed_request_template": {{
+    "initial_ids": {{
+      "characters": ["char_main", "<same_char_slug_if_any>"],
+      "locations": ["<same_loc_slug_if_any>"],
+      "props": ["<same_prop_slug_if_any>"]
+    }},
+    "hints": {{
+      // EXACTLY the same mapping as cover_entities.hints
+    }}
+  }}
 }}
+Return only that JSON object. No explanations.
 """.strip()

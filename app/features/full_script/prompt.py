@@ -4,50 +4,88 @@ from .schemas import FullScriptRequest
 def build_full_script_prompt(req: FullScriptRequest) -> str:
     traits = ", ".join([f"{q} - {a}" for q, a in req.user_answers_list.items()]) if req.user_answers_list else ""
     return f"""
-Excellent. This is the final step in the scriptwriting process, designed to be used after the user has paid. This prompt takes the approved cover concept and the concise story summary and expands it into the full, detailed, multi-page comic script.
-As requested, this prompt is adapted from your previous one, using the story_summary as the primary creative driver.
+Excellent. This is the final step in the scriptwriting process, used after payment. Expand the approved story summary into a full, multi-page comic script.
 
-Final Prompt: Full Script Generation (Post-Payment)
+ROLE:
+You are an elite comic writer and storyboard artist. Output ONLY a single JSON object that conforms to the schema below.
 
-You are an elite-level comic book writer and storyboard artist, a creative fusion of a master storyteller known for wit and charm, and a film director known for brilliant visual comedy. Your task is to expand the provided story summary into a complete, hilarious, and visually rich comic book script, formatted as a single, clean JSON object.
-
-CONTEXT & INPUTS:
-Story Summary to Adapt: "{req.story_summary}"
-Comic Title: "{req.title}"
-Comic Tagline: "{req.tagline}"
-Main Character Name: "{req.user_name}"
-Main Character Gender: "{req.user_gender}"
-Total Page Count: "{req.page_count}"
-Core Theme: "{req.user_theme}"
-Character's Comedic Traits (Source material for jokes, use them creatively): "{traits}"
+CONTEXT INPUTS:
+- Story Summary: "{req.story_summary}"
+- Comic Title: "{req.title}"
+- Comic Tagline: "{req.tagline}"
+- Main Character Name: "{req.user_name}"
+- Main Character Gender: "{req.user_gender}"
+- Total Page Count: {req.page_count}
+- Core Theme: "{req.user_theme}"
+- Comedic Traits (for jokes): "{traits}"
 
 PRIMARY DIRECTIVE:
-Take the provided Story Summary and expand it into a complete, page-by-page comic book script. The script must be a brilliant and funny narrative that fills the specified Total Page Count. The script must be returned as a single JSON object containing only the pages array, adhering strictly to the schema and creative mandates below.
+Expand the Story Summary faithfully into {req.page_count} pages. Vary panel counts per page between {req.min_panels_per_page} and {req.max_panels_per_page}. Provide extremely detailed art_descriptions (camera angle, actions, expressions, background elements, lighting). Do NOT obscure the main character’s face with accessories.
 
-CREATIVE MANDATES & RULES:
-Faithfully Expand the Summary: The script's plot MUST be a direct and faithful expansion of the provided Story Summary. Elaborate on the key events, dialogue, and gags outlined in the summary to create the full narrative.
-Pacing and Structure: Distribute the story across the {req.page_count} pages. Ensure a clear beginning, a rising action, a comedic climax, and a satisfyingly funny resolution on the final page, all based on the summary's arc.
-Panels per Page: Panels per page must be between {req.min_panels_per_page} and {req.max_panels_per_page} (inclusive). For EACH page, choose a panel count randomly within that range, and vary counts across pages; do not use the same number on every page unless it serves a clear comedic or narrative purpose.
-Genius-Level Detail for Illustration: For every art_description field, be EXTREMELY detailed. Describe camera angles (e.g., 'Wide shot', 'Close-up on face'), the character's specific actions and expressions, background elements, and lighting. You are the eyes for the illustration AI.
-Character Appearance: In your art descriptions, do not add any facial accessories like masks or glasses to the main character, or anything that might obscure their face and damage the resemblance to the source photo.
+ENTITY & LOOKBOOK RULES:
+- Every character/prop/location used MUST reference a stable ID string.
+- Use IDs in two places: (1) page-level lists (characters/props/location_id), and (2) per-panel overrides where needed.
+- The main character MUST use id "char_main". Use the provided name "{req.user_name}" in dialogue, but keep the ID "char_main".
+- If you need a new entity that is not already known, add a stub to lookbook_delta.*_to_add with:
+  - a unique "id" (e.g., "char_yaron", "loc_studio", "prop_laptop"),
+  - a human name ("display_name" or "name"),
+  - a brief "visual_stub" description,
+  - "needs_concept_sheet": true.
+- Do NOT invent unnamed entities; everything must be referenced by ID or declared in lookbook_delta.
 
-JSON SCHEMA (Your entire output MUST be a single JSON object containing ONLY the pages array):
+STRICT JSON SCHEMA (your entire output MUST be a single JSON object with exactly these fields):
 {{
   "pages": [
     {{
       "page_number": 1,
+      "location_id": "loc_id_or_null",
+      "characters": ["char_main", "char_support_1"],
+      "props": ["prop_laptop"],
       "panels": [
         {{
           "panel_number": 1,
-          "art_description": "EXTREMELY detailed visual description. Describe camera angle (e.g., 'Wide shot', 'Close-up on face'), character's action, specific expression, background elements, and lighting. Be the eyes for the illustrator AI.",
-          "dialogue": "Character Name: 'The dialogue for this panel.' or '' if there is no dialogue.",
-          "narration": "A narration box text, like a storyteller's voice. or '' if there is none.",
-          "sfx": "Sound effects like 'CRASH!', 'BEEP!', or 'THWUMP!'. Leave as '' if there are none."
+          "art_description": "EXTREMELY detailed visual description incl. camera angle, action, expression, background, and lighting.",
+          "dialogue": "Character Name: 'The dialogue for this panel.' or '' if none.",
+          "narration": "Narration text or '' if none.",
+          "sfx": "Onomatopoeia or '' if none.",
+          "characters": ["char_main"],
+          "props": ["prop_laptop"],
+          "location_id": "loc_id_or_null"
         }}
       ]
     }}
-  ]
+  ],
+  "lookbook_delta": {{
+    "characters_to_add": [
+      {{
+        "id": "char_support_1",
+        "display_name": "Yaron",
+        "role": "co-founder",
+        "visual_stub": "tall, shaved head, warm smile, casual blazer",
+        "needs_concept_sheet": true
+      }}
+    ],
+    "locations_to_add": [
+      {{
+        "id": "loc_studio",
+        "name": "Indie studio",
+        "visual_stub": "brick wall, neon sign, dual monitors, warm practical lights",
+        "needs_concept_sheet": true
+      }}
+    ],
+    "props_to_add": [
+      {{
+        "id": "prop_laptop",
+        "name": "Laptop",
+        "visual_stub": "no brand logo, two small stickers on lid",
+        "needs_concept_sheet": true
+      }}
+    ]
+  }}
 }}
 
-Output ONLY the JSON object. Do not wrap in markdown fences. Do not add commentary.
+MANDATES:
+- Pacing: clear beginning → rise → comedic climax → satisfying, funny resolution on the final page.
+- Panels per page: choose randomly in [{req.min_panels_per_page}, {req.max_panels_per_page}] and vary across pages unless narratively justified.
+- No extra commentary or markdown. Output ONLY the JSON object.
 """.strip()

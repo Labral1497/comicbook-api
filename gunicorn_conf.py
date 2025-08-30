@@ -9,7 +9,6 @@ timeout = 1800            # hard kill after N seconds of no response
 graceful_timeout = 120    # time to gracefully stop workers
 keepalive = 75
 threads = 2
-timeout = 600            # allow long requests
 
 # הגנות מזליגת זיכרון: ריסטארט worker אחרי X בקשות
 max_requests = int(os.getenv("MAX_REQUESTS", "1000"))

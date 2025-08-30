@@ -1,6 +1,6 @@
 # app/features/full_script/router.py
-from fastapi import APIRouter, HTTPException
-import json, os, uuid
+from fastapi import APIRouter
+import json, os
 from typing import Any, Dict
 from app.logger import get_logger
 from app.lib.paths import make_job_dir_with_id

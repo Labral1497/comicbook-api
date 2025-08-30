@@ -7,6 +7,8 @@ from app.features.cover_script.router import router as cover_script_router
 from app.features.full_script.router import router as full_script_router
 from app.features.pages.router import router as pages_router
 from app.features.admin.router import router as admin_router
+from app.features.lookbook_seed.router import router as lookbook_seed_router
+from app.features.lookbook_ref_assets.router import router as lookbook_ref_assets_router
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.lib.cleanup import sweep_finished_jobs
@@ -36,6 +38,8 @@ app.include_router(cover_script_router)
 app.include_router(full_script_router)
 app.include_router(pages_router)
 app.include_router(admin_router)
+app.include_router(lookbook_seed_router)
+app.include_router(lookbook_ref_assets_router)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
