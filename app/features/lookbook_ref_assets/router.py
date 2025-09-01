@@ -5,8 +5,8 @@ from app.config import config
 from app.lib.paths import ensure_job_dir, job_dir
 from app.lib.gcs_inventory import upload_json_to_gcs, download_gcs_object_to_file
 from app.lib.cloud_tasks import create_task
-from .schemas import GenerateRefAssetsRequest, GenerateRefAssetsResponse
-from .service import generate_ref_assets
+from .schemas import CleanAssetsRequest, CleanAssetsResponse, GenerateRefAssetsRequest, GenerateRefAssetsResponse
+from .service import clean_lookbook_assets, generate_ref_assets
 
 router = APIRouter(prefix="/api/v1", tags=["lookbook"])
 log = get_logger(__name__)
@@ -75,3 +75,14 @@ async def worker_ref_assets(job_id: str, request: Request) -> GenerateRefAssetsR
     except Exception as e:
         log.exception(f"worker ref-assets failed: {e}")
         raise HTTPException(500, "worker ref-assets failed")
+
+
+@router.post("/lookbook/clean-assets", response_model=CleanAssetsResponse)
+async def lookbook_clean_assets(req: CleanAssetsRequest) -> CleanAssetsResponse:
+    try:
+        return clean_lookbook_assets(req)
+    except FileNotFoundError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        log.exception(f"lookbook clean-assets failed: {e}")
+        raise HTTPException(500, "lookbook clean-assets failed")

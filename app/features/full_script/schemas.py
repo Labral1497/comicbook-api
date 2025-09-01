@@ -1,32 +1,36 @@
-# app/features/full_script/schemas.py
-from typing import Dict
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
+
 
 # ----- Lookbook delta stubs -----
 
 class CharacterToAdd(BaseModel):
     id: str
     display_name: str
-    role: str | None = None
-    visual_stub: str | None = None
+    role: Optional[str] = None
+    visual_stub: Optional[str] = None
     needs_concept_sheet: bool = True
+
 
 class LocationToAdd(BaseModel):
     id: str
     name: str
-    visual_stub: str | None = None
+    visual_stub: Optional[str] = None
     needs_concept_sheet: bool = True
+
 
 class PropToAdd(BaseModel):
     id: str
     name: str
-    visual_stub: str | None = None
+    visual_stub: Optional[str] = None
     needs_concept_sheet: bool = True
 
+
 class LookbookDelta(BaseModel):
-    characters_to_add: list[CharacterToAdd] = Field(default_factory=list)
-    locations_to_add: list[LocationToAdd] = Field(default_factory=list)
-    props_to_add: list[PropToAdd] = Field(default_factory=list)
+    characters_to_add: List[CharacterToAdd] = Field(default_factory=list)
+    locations_to_add: List[LocationToAdd] = Field(default_factory=list)
+    props_to_add: List[PropToAdd] = Field(default_factory=list)
+
 
 # ----- Script models -----
 
@@ -36,32 +40,33 @@ class Panel(BaseModel):
     dialogue: str
     narration: str
     sfx: str
-    # NEW: entity references per panel (optional)
-    characters: list[str] = Field(default_factory=list)
-    props: list[str] = Field(default_factory=list)
-    location_id: str | None = None
+    characters: List[str] = Field(default_factory=list)  # char_* ids
+    props: List[str] = Field(default_factory=list)       # prop_* ids
+    location_id: Optional[str] = None                    # "" or loc_*
+
 
 class Page(BaseModel):
     page_number: int
-    panels: list[Panel]
-    # NEW: page-level entity declarations (optional; panels can override)
-    location_id: str | None = None
-    characters: list[str] = Field(default_factory=list)
-    props: list[str] = Field(default_factory=list)
+    panels: List[Panel]
+    location_id: Optional[str] = None                    # "" or loc_*
+    characters: List[str] = Field(default_factory=list)  # char_* ids (optional per page)
+    props: List[str] = Field(default_factory=list)       # prop_* ids (optional per page)
+
 
 class FullScriptPagesResponse(BaseModel):
-    pages: list[Page]
-    # NEW: allows the writer to declare new entities needed
+    pages: List[Page]
     lookbook_delta: LookbookDelta = LookbookDelta()
 
+
 class FullScriptRequest(BaseModel):
+    job_id: Optional[str] = None
     title: str
     tagline: str
-    story_summary: str                 # <-- replaces 'synopsis'
+    story_summary: str
     user_name: str
     user_gender: str
-    page_count: int                    # [Page_Count]
-    user_theme: str                    # [User_Theme]
-    user_answers_list: Dict[str, str] = Field(default_factory=dict)  # Q&A dict
+    page_count: int
+    user_theme: str
+    user_answers_list: Dict[str, str] = Field(default_factory=dict)
     min_panels_per_page: int = 3
     max_panels_per_page: int = 6

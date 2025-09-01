@@ -1,0 +1,26 @@
+{
+  "job_id": "cebdc73f3afb4e9d8dcdaa6f29ae04ea",
+  "ids": [
+    "char_fruit_vendor",
+    "loc_market",
+    "prop_inflatable_fruit",
+    "prop_race_banner"
+  ],
+  "asset_types": {
+    "char_fruit_vendor": [
+      "portrait",
+      "turnaround"
+    ],
+    "loc_market": [
+      "wide"
+    ],
+    "prop_inflatable_fruit": [
+      "detail"
+    ],
+    "prop_race_banner": [
+      "detail"
+    ]
+  },
+  "force": false,
+  "user_theme": "Pixar 3D animated cartoon style — Bright, polished, and highly expressive 3D cartoon look with cinematic warmth; friendly, emotive characters with slightly exaggerated heads, large expressive eyes, and rounded features; clear silhouettes, clean lines, and small memorable costume details; smooth shading with subtle fabric/skin/prop textures; vibrant harmonious colors with warm tones; soft cinematic lighting with occasional rim light, diffused shadows, and strong depth cues; stylized realistic environments—simplified for clarity, saturated foregrounds, softer backgrounds; warm, optimistic, family-friendly mood with strong visual appeal; bold, playful hand-lettered title and SFX. Maintain accurate likeness of the main character. No logos or trademarks"
+}

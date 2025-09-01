@@ -5,7 +5,7 @@ bind = f"0.0.0.0:{os.getenv('PORT', '8080')}"
 worker_class = "uvicorn.workers.UvicornWorker"
 
 # כמה workers? כלל אצבע: (CPU cores * 2) או 2–4 להתחלה
-timeout = 1800            # hard kill after N seconds of no response
+timeout = 3600            # hard kill after N seconds of no response
 graceful_timeout = 120    # time to gracefully stop workers
 keepalive = 75
 threads = 2

@@ -1,8 +1,9 @@
+import glob
 import io
 import json
 import os
 import re
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import uuid
 from datetime import timedelta
 from fastapi import HTTPException
@@ -172,3 +173,43 @@ def download_gcs_object_to_file(gs_uri: str, dest_path: str) -> None:
 
     os.makedirs(os.path.dirname(dest_path) or ".", exist_ok=True)
     blob.download_to_filename(dest_path)
+
+def _get_bucket():
+    client = storage.Client()
+    bucket_name = getattr(config, "gcs_bucket", None) or getattr(config, "gcs_bucket_name", None)
+    if not bucket_name:
+        raise RuntimeError("Set config.gcs_bucket_name (or config.gcs_bucket)")
+    return client.bucket(bucket_name)
+
+def list_objects(prefix: str) -> List[str]:
+    """Return object names under the prefix (no leading gs://bucket/)."""
+    bucket = _get_bucket()
+    return [blob.name for blob in bucket.list_blobs(prefix=prefix)]
+
+def delete_gcs_object(object_name: str) -> None:
+    """Delete a single object by name (jobs/.../file.png)."""
+    bucket = _get_bucket()
+    bucket.blob(object_name).delete()
+
+def delete_objects(object_names: List[str]) -> None:
+    """Best-effort batch delete; falls back to per-object if batch not supported."""
+    client = storage.Client()
+    bucket = _get_bucket()
+    with client.batch():
+        for name in object_names:
+            bucket.blob(name).delete()
+
+def _local_matches(id_folder: str, t: str) -> list[str]:
+    # stable + versioned
+    pats = [os.path.join(id_folder, f"{t}.png"),
+            os.path.join(id_folder, f"{t}_v*.png")]
+    out = []
+    for p in pats:
+        out.extend(glob.glob(p))
+    return out
+
+def _gcs_matches(job_id: str, _id: str, t: str) -> list[str]:
+    # requires list_objects(prefix=...)
+    prefix = f"jobs/{job_id}/lookbook/{_id}/"
+    objs = list_objects(prefix)  # returns e.g. ["jobs/.../portrait.png", "jobs/.../portrait_v2.png", ...]
+    return [o for o in objs if o.endswith(f"/{t}.png") or f"/{t}_v" in o]

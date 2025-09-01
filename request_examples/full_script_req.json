@@ -1,4 +1,5 @@
 {
+  "job_id": "cebdc73f3afb4e9d8dcdaa6f29ae04ea",
   "title": "Wingsuit Warrior: High-Flying Hijinks",
   "tagline": "Soar high or fall flat!",
   "story_summary": "In a quest to conquer the skies, plumber Roey Levartovsky takes on his rival Mike in a series of increasingly outrageous wingsuit challenges over Dubai. From high-flying dance-offs to comical mishaps involving unexpected wind gusts, Roey's dream of flying becomes a hilarious adventure. With his catchphrase, 'It is not me! It's my dark side!', Roey proves that even the most absurd dreams can lead to unforgettable fun and friendship.",
@@ -7,8 +8,12 @@
   "page_count": 15,
   "user_theme": "Pixar 3D animated cartoon style — Bright, polished, and highly expressive 3D cartoon look with cinematic warmth; friendly, emotive characters with slightly exaggerated heads, large expressive eyes, and rounded features; clear silhouettes, clean lines, and small memorable costume details; smooth shading with subtle fabric/skin/prop textures; vibrant harmonious colors with warm tones; soft cinematic lighting with occasional rim light, diffused shadows, and strong depth cues; stylized realistic environments—simplified for clarity, saturated foregrounds, softer backgrounds; warm, optimistic, family-friendly mood with strong visual appeal; bold, playful hand-lettered title and SFX. Maintain accurate likeness of the main character. No logos or trademarks",
   "user_answers_list": {
-    "What is Roey's comedic style?": "self-deprecating humor",
-    "What situation always gets him stuck?": "debugging mishaps"
+    "What is Roey's job?": "A stunt man (wingsuit)",
+    "What is Roey's dream?": "To fly over the Burj Khalifa building",
+    "Who is Roey's biggest nemesis?": "His opponent Mike (who has a blonde mohwak)",
+    "Where is Roey from?": "Russia",
+    "What is Roey's catchphrase?": "see you later. chump!",
+    "What is Roey's secret power": "To be the best at everything he does"
   },
   "min_panels_per_page": 4,
   "max_panels_per_page": 6

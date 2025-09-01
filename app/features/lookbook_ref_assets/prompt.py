@@ -7,7 +7,6 @@ def _style_line(style_theme: str | None) -> str:
 def _canon_str(visual_canon: Dict[str, str] | Dict) -> str:
     if not visual_canon:
         return ""
-    # Compact "k:v" lines; avoid dumping huge JSON blobs
     parts = []
     for k, v in visual_canon.items():
         if isinstance(v, (list, tuple)):
@@ -15,53 +14,65 @@ def _canon_str(visual_canon: Dict[str, str] | Dict) -> str:
         parts.append(f"{k}: {v}")
     return " | ".join(parts)
 
-# ---------------- Characters ----------------
+# ---- Characters ----
 
-def character_portrait_prompt(display_name: str, visual_canon: Dict, style_theme: str | None) -> str:
+def character_portrait_prompt(
+    display_name: str,
+    visual_canon: Dict,
+    style_theme: str | None,
+    gender: str | None = None,
+) -> str:
     canon = _canon_str(visual_canon)
+    gender_line = f" Gender presentation: {gender}." if gender else ""
     return (
-        f"Character concept PORTRAIT of {display_name}. "
-        "Single subject only. Chest-up framing on a neutral background with studio lighting. "
-        "Face fully visible (no occlusion), natural expression, clean silhouette. "
-        "Consistent facial features and hairstyle for production continuity. "
-        f"{canon}{_style_line(style_theme)} "
-        "If a reference image is provided for this character, strictly preserve the person’s likeness and proportions, "
-        "and keep palette/lighting consistent with that reference. "
-        "Do NOT add other people, hands, or text. No labels or watermarks."
+        f"Character concept portrait of {display_name}. "
+        "Neutral background, studio lighting. Chest-up framing. "
+        "Face fully visible (no occlusion). Natural expression. "
+        f"Consistent features for comic production.{gender_line} {canon}"
+        f"{_style_line(style_theme)} "
+        "If a likeness reference is attached, match facial structure and key features. "
+        "Clean linework and color; no text or labels."
     ).strip()
 
-def character_turnaround_prompt(display_name: str, visual_canon: Dict, style_theme: str | None) -> str:
+def character_turnaround_prompt(
+    display_name: str,
+    visual_canon: Dict,
+    style_theme: str | None,
+    gender: str | None = None,
+) -> str:
     canon = _canon_str(visual_canon)
+    gender_line = f" Gender presentation: {gender}." if gender else ""
     return (
-        f"Full-body character TURNAROUND sheet of {display_name}: front, side, and back views on a single canvas. "
-        "Neutral background, flat even lighting, consistent proportions and costume details. "
-        f"{canon}{_style_line(style_theme)} "
-        "If a reference image is provided for this character, keep likeness (face/head/hairstyle) and overall style consistent. "
-        "No additional characters, no props in hand, no text or labels."
+        f"Full-body character turnaround sheet of {display_name}: front, side, and back views on a single sheet. "
+        "Neutral background, flat even lighting. Consistent proportions for comic production."
+        f"{gender_line} {canon}"
+        f"{_style_line(style_theme)} "
+        "Use the supplied portrait (if available) as the primary likeness reference. "
+        "Maintain identical face, hairstyle, and body type as the portrait. "
+        "Clean linework and color; no text or labels."
     ).strip()
 
-# ---------------- Locations ----------------
+# ---- Locations ----
 
 def location_wide_prompt(name: str, visual_canon: Dict, style_theme: str | None) -> str:
     canon = _canon_str(visual_canon)
     return (
-        f"Location concept art — WIDE establishing shot of {name}. "
-        "Environment-only rendering that emphasizes architecture, scale, lighting, and mood. "
-        f"{canon}{_style_line(style_theme)} "
-        "Do NOT include people, silhouettes, crowds, characters, or figures of any kind. "
-        "Avoid vehicles/animals unless essential to the identity of the place. "
-        "Clean presentation; no signage text, no labels, no watermarks."
+        f"Location concept art: wide establishing shot of {name}. "
+        f"Emphasize canonical features. {canon}"
+        f"{_style_line(style_theme)} "
+        "No people or characters in frame. "
+        "Match the rendering style and palette of other assets. "
+        "Clean presentation; no signage text; no labels."
     ).strip()
 
-# ---------------- Props ----------------
+# ---- Props ----
 
 def prop_detail_prompt(name: str, visual_canon: Dict, style_theme: str | None) -> str:
     canon = _canon_str(visual_canon)
     return (
-        f"Prop concept image: {name}. "
-        "Centered product-style render on a neutral background with soft studio lighting. "
-        "Orthographic/three-quarter clarity; show silhouette and key material details. "
+        f"Prop concept image: {name}. Product-photo style on neutral background. "
+        "Orthographic feel; show silhouette and key details. "
         f"{canon}{_style_line(style_theme)} "
-        "If a reference image is provided for this prop, keep materials, palette, and finish consistent. "
-        "Do NOT include hands, models, or people. No text, logos, or labels unless specified."
+        "Match rendering style and palette of other assets. "
+        "No logos unless specified; no text or labels."
     ).strip()
