@@ -1,33 +1,24 @@
-import json
-import os
-from typing import Any, Dict
-
 from fastapi import APIRouter
-
+import json, os
+from typing import Any, Dict
 from app.logger import get_logger
 from app.lib.paths import ensure_job_dir, make_job_dir_with_id
 from app.lib.gcs_inventory import upload_json_to_gcs
-from app.features.lookbook_ref_assets.service import (
-    _load_lookbook as _lb_load,
-    _save_lookbook as _lb_save,
-)
-from app.features.lookbook_seed.schemas import (
-    LookbookCharacter,
-    LookbookDoc,
-    LookbookLocation,
-    LookbookProp,
-)
-from .schemas import FullScriptPagesResponse, FullScriptRequest
+
+from .schemas import FullScriptRequest, FullScriptPagesResponse
 from .service import generate_full_script
+
+# reuse lookbook helpers & models
+from app.features.lookbook_ref_assets.service import _load_lookbook as _lb_load, _save_lookbook as _lb_save
+from app.features.lookbook_seed.schemas import LookbookDoc, LookbookCharacter, LookbookLocation, LookbookProp
 
 router = APIRouter(prefix="/api/v1", tags=["full-script"])
 log = get_logger(__name__)
 
-
-def _apply_delta_to_lookbook(lb: LookbookDoc, delta) -> LookbookDoc:
+def _apply_delta_to_lookbook(lb: LookbookDoc, script_delta) -> LookbookDoc:
     def present(lst, _id): return any(getattr(x, "id", None) == _id for x in lst)
 
-    for c in delta.characters_to_add or []:
+    for c in script_delta.characters_to_add or []:
         if not present(lb.characters, c.id):
             lb.characters.append(
                 LookbookCharacter(
@@ -39,7 +30,8 @@ def _apply_delta_to_lookbook(lb: LookbookDoc, delta) -> LookbookDoc:
                     created_from="script_v1",
                 )
             )
-    for l in delta.locations_to_add or []:
+
+    for l in script_delta.locations_to_add or []:
         if not present(lb.locations, l.id):
             lb.locations.append(
                 LookbookLocation(
@@ -50,7 +42,8 @@ def _apply_delta_to_lookbook(lb: LookbookDoc, delta) -> LookbookDoc:
                     created_from="script_v1",
                 )
             )
-    for p in delta.props_to_add or []:
+
+    for p in script_delta.props_to_add or []:
         if not present(lb.props, p.id):
             lb.props.append(
                 LookbookProp(
@@ -63,16 +56,14 @@ def _apply_delta_to_lookbook(lb: LookbookDoc, delta) -> LookbookDoc:
             )
     return lb
 
-
 @router.post("/generate/comic/full-script", status_code=201)
 async def full_script_create_job(req: FullScriptRequest) -> Dict[str, Any]:
     """
     Generate the full script using the existing lookbook (if job_id given).
     Save script.json (pages only) to GCS.
-    Apply lookbook_delta to lookbook.json and upload it.
-    Return job_id, script (pages only), lookbook_delta, and GCS pointers.
+    Apply lookbook_delta (derived from recurring usage) to lookbook.json and upload it.
+    Return job_id, script GCS, lookbook_delta, and lookbook GCS pointers.
     """
-    # Ensure we have a job id BEFORE generation so the service can read the lookbook
     if req.job_id:
         job_id = req.job_id
         workdir = ensure_job_dir(job_id)
@@ -80,16 +71,14 @@ async def full_script_create_job(req: FullScriptRequest) -> Dict[str, Any]:
         job_id, workdir = make_job_dir_with_id()
         req.job_id = job_id
 
-    # 1) Generate script (with lookbook_delta inside)
     script: FullScriptPagesResponse = await generate_full_script(req)
 
-    # 2) Persist script.json (PAGES ONLY — no delta)
+    # Save script.json (pages only)
     script_only = {"pages": [p.model_dump() for p in script.pages]}
-    script_path = os.path.join(workdir, "script.json")
-    with open(script_path, "w") as f:
+    with open(os.path.join(workdir, "script.json"), "w") as f:
         json.dump(script_only, f, ensure_ascii=False, indent=2)
 
-    # 3) Upload script.json to GCS
+    # Upload script.json
     try:
         script_gcs = upload_json_to_gcs(
             data=script_only,
@@ -103,7 +92,7 @@ async def full_script_create_job(req: FullScriptRequest) -> Dict[str, Any]:
         log.exception(f"Failed to upload script.json to GCS: {e}")
         script_gcs = None
 
-    # 4) Apply lookbook_delta to lookbook.json and upload
+    # Apply derived delta to lookbook and upload
     lb = _lb_load(os.path.join(workdir, "lookbook.json")) or LookbookDoc()
     lb = _apply_delta_to_lookbook(lb, script.lookbook_delta)
     _lb_save(os.path.join(workdir, "lookbook.json"), lb)
@@ -121,16 +110,13 @@ async def full_script_create_job(req: FullScriptRequest) -> Dict[str, Any]:
         log.exception(f"Failed to upload lookbook.json to GCS: {e}")
         lookbook_gcs = None
 
-    # 5) Hand back the delta so you can call generate-ref-assets next
-    delta_dump = script.lookbook_delta.model_dump()
-
     return {
         "job_id": job_id,
         "script_gcs": script_gcs,
-        "lookbook_delta": delta_dump,
+        "lookbook_delta": script.lookbook_delta.model_dump(),
         "lookbook_gcs": lookbook_gcs,
         "next": {
             "enqueue_ref_assets_url": "/api/v1/lookbook/enqueue-ref-assets",
-            "note": "Use lookbook_delta IDs (or any missing types) with force=true to create reference assets.",
+            "note": "Use lookbook_delta IDs (or any missing types) with force=true to create reference assets."
         },
     }

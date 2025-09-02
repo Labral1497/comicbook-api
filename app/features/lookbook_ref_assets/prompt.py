@@ -56,14 +56,23 @@ def character_turnaround_prompt(
 
 def location_wide_prompt(name: str, visual_canon: Dict, style_theme: str | None) -> str:
     canon = _canon_str(visual_canon)
+    # A shared anti-text clause you can reuse across all asset prompts
+    ANTI_TEXT = (
+        "ABSOLUTELY NO TEXT OF ANY KIND IN THE IMAGE. "
+        "No captions, no labels, no UI/overlays, no watermarks, no logos, no brand marks, "
+        "no letters or numbers, no Arabic or Latin glyphs, no signage. "
+        "If a sign or billboard is visible, it must be completely blank."
+    )
     return (
-        f"Location concept art: wide establishing shot of {name}. "
+        f"Environment illustration — wide exterior view of {name}. "
         f"Emphasize canonical features. {canon}"
         f"{_style_line(style_theme)} "
-        "No people or characters in frame. "
-        "Match the rendering style and palette of other assets. "
-        "Clean presentation; no signage text; no labels."
+        "Borderless frame; clean composition; match palette to existing assets. "
+        "No people or characters present. "
+        f"{ANTI_TEXT} "
+        "Repeat: the image must be entirely free of any readable or stylized text."
     ).strip()
+
 
 # ---- Props ----
 

@@ -1,20 +1,12 @@
-from typing import Dict, List, Tuple
 from .schemas import FullScriptRequest
-
+from typing import Dict, List, Tuple
 
 def _fmt_label(it: Dict[str, str]) -> str:
-    """
-    Render a human label and append gender if available.
-    """
     label = it.get("display_name") or it.get("name") or it["id"]
     g = (it.get("gender") or "").strip()
     return f"\"{label}\" (gender: {g})" if g else f"\"{label}\""
 
-
 def _format_known(title: str, items: List[Dict[str, str]]) -> str:
-    """
-    Render the known entities block for the prompt (IDs + labels).
-    """
     if not items:
         return f"- {title}: (none)\n"
     lines = [f"- {title}:"]
@@ -22,46 +14,23 @@ def _format_known(title: str, items: List[Dict[str, str]]) -> str:
         lines.append(f"  • {it['id']} → {_fmt_label(it)}")
     return "\n".join(lines) + "\n"
 
-
-def _targets_for_pages(pages: int) -> Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]:
-    """
-    NEW minima for stories of length `pages` (counts of NEW entities to introduce).
-    Return: (char_min,max), (loc_min,max), (prop_min,max)
-    """
-    if pages < 6:
-        return (0, 1), (0, 1), (0, 2)
-    if pages <= 15:
-        return (2, 3), (2, 3), (1, 3)
-    if pages <= 20:
-        return (2, 3), (2, 3), (2, 3)
-    return (2, 3), (2, 3), (2, 5)
-
-
 def build_full_script_prompt(
     req: FullScriptRequest,
     known: Dict[str, List[Dict[str, str]]],
-    need_chars: int,
-    need_locs: int,
-    need_props: int,
 ) -> str:
-    traits = (
-        ", ".join([f"{q} - {a}" for q, a in req.user_answers_list.items()])
-        if req.user_answers_list
-        else ""
-    )
-
+    traits = ", ".join([f"{q} - {a}" for q, a in (req.user_answers_list or {}).items()]) if getattr(req, "user_answers_list", None) else ""
     known_block = (
-        "KNOWN ENTITIES (reuse these IDs whenever applicable):\n"
+        "KNOWN ENTITIES (primary cast & spaces — reuse these IDs when they fit):\n"
         + _format_known("Characters", known.get("characters", []))
         + _format_known("Locations",  known.get("locations",  []))
         + _format_known("Props",      known.get("props",      []))
     )
 
     return f"""
-Excellent. This is the final step in the scriptwriting process, used after payment. Expand the approved story summary into a full, multi-page comic script.
+Expand the approved story summary into a full, multi-page comic script.
 
 ROLE:
-You are an elite comic writer and storyboard artist. Output ONLY a single JSON object that conforms to the JSON Schema enforced by the system (you will be validated strictly).
+You are an elite comic writer + storyboard artist. Output ONLY a single JSON object that conforms to the JSON Schema (strictly validated).
 
 CONTEXT INPUTS:
 - Story Summary: "{req.story_summary}"
@@ -71,57 +40,46 @@ CONTEXT INPUTS:
 - Main Character Gender: "{req.user_gender}"
 - Total Page Count: {req.page_count}
 - Core Theme: "{req.user_theme}"
-- Comedic Traits (for jokes): "{traits}"
+- Comedic Traits: "{traits}"
 
 {known_block}
-ID RULES (IMPORTANT):
-- IDs are stable strings:
-  • Character IDs start with "char_" (e.g., char_main, char_mike)
-  • Location IDs start with "loc_" (e.g., loc_burj_khalifa_rooftop)
-  • Prop IDs start with "prop_" (e.g., prop_wingsuit)
-- ALWAYS reuse KNOWN ENTITIES when they fit; create NEW entities ONLY to meet the exact counts below.
-- The main character MUST be "char_main". Use the human name in dialogue, but keep the ID "char_main" in lists.
-- Background extras that are not story-relevant should NOT get IDs (mention them only in art_description).
 
-GENDER CONSISTENCY (MANDATORY):
-- Respect each known character’s gender listed above.
-- For any NEW character, start lookbook_delta.characters_to_add[*].visual_stub with "gender: ...".
+ID & CONSISTENCY RULES:
+- Stable ID prefixes:
+  • Characters:  char_*   (e.g., char_main)
+  • Locations:   loc_*    (e.g., loc_burj_khalifa_rooftop)
+  • Props:       prop_*   (e.g., prop_wingsuit)
+- Favor and reuse KNOWN IDs above. Introduce NEW IDs only if the story benefits.
+- If you introduce a NEW recurring entity, keep its ID consistent across pages/panels.
+- Background one-off extras and throwaway gags should NOT get IDs; just describe them in art_description.
 
-NEW-ENTITY INTRODUCTION TARGETS (HARD, EXACT):
-- You MUST add exactly:
-  • New Characters: {need_chars}
-  • New Locations:  {need_locs}
-  • New Props:      {need_props}
-(If any of these are 0, DO NOT add any new items of that type.)
+VARIETY & RECURRING IDS (NATURAL, NO QUOTAS):
+- If a non-core character speaks, is named, or appears on ≥2 pages (or ≥3 panels), give them a char_* ID and tag them in panel.characters when on-camera.
+- Avoid leaving page.location_id empty; when the scene continues across pages, reuse the prior page’s location_id. For broad aerial runs, define a canonical setting (e.g., loc_sky_over_dubai) and reuse it.
+- If a prop is story-relevant and visible across ≥2 pages (or ≥3 panels), assign a prop_* ID and include it in panel.props wherever visible.
+- Only include recurring entities in lookbook_delta. One-offs remain anonymous in art_description.
 
-USAGE-FIRST & DELTA DERIVATION (HARD RULE):
-- First, plan where each NEW entity will appear.
-- Then write the pages.
-- Finally, set lookbook_delta = (all IDs you actually used in pages) minus (KNOWN ENTITIES).
-- DO NOT include any ID in lookbook_delta unless it is actually used in pages per the usage counts below.
+GENDER NOTE (only if you add new characters and you decide to include them in lookbook_delta):
+- Begin lookbook_delta.characters_to_add[*].visual_stub with "gender: ...".
+- The server derives lookbook_delta automatically; you MAY leave lookbook_delta arrays empty.
 
-USAGE COUNTS (MANDATORY):
-- NEW Character IDs → appear in at least 2 distinct PANELS (panel.characters).
-- NEW Location IDs  → used on at least 1 PAGE as page.location_id (preferred), OR appear in at least 2 PANELS via panel.location_id.
-- NEW Prop IDs      → appear in at least 2 distinct PANELS (panel.props).
-- If any NEW entity fails these counts, revise the pages before you output.
+OUTPUT SHAPE (IMPORTANT):
+- pages: exactly {req.page_count}; panels per page within [{req.min_panels_per_page}, {req.max_panels_per_page}] and varied.
+- Provide cinematic art_description (camera, actions, expressions, background, lighting).
+- Keep the main character’s face readable (no full obstruction).
+- Use "" for missing location_id and [] for empty characters/props arrays.
+- You MAY leave lookbook_delta empty — the system will compute it from recurring usage.
 
-ACT PLACEMENT (RECOMMENDED):
-- Introduce at least one NEW entity (character OR location OR prop) by page 4;
-  another NEW entity by pages 8–10; and pay it off by the final two pages.
+NATURAL WRITING:
+- Prioritize natural story flow and visual clarity.
+- Reuse the core cast and spaces above; organically introduce new ones only when they add value (e.g., new venue, helper, vehicle).
+- Recurring entities should reappear logically across pages; cameos stay un-ID’d.
 
-SCRIPT SHAPE & CONSTRAINTS:
-- Pages: exactly {req.page_count}. Panels per page must vary and stay within [{req.min_panels_per_page}, {req.max_panels_per_page}].
-- Provide detailed art_description (camera angle, actions, expressions, background, lighting).
-- Do NOT obscure the main character’s face with accessories.
-- If a field is not applicable, use "" for location_id and [] for characters/props.
+FINAL CHECKLIST BEFORE YOU OUTPUT:
+- JSON-only, no commentary/markdown.
+- Every ID used in pages is consistently spelled.
+- If you chose to include lookbook_delta, include only recurring entities (not one-offs).
 
-FINAL SELF-CHECK (MANDATORY):
-- Every ID in lookbook_delta appears in pages with the required usage counts.
-- No ID used in pages/panels is missing from KNOWN ENTITIES or lookbook_delta.
-- Genders are consistent.
-
-OUTPUT:
-- Return ONLY a single JSON object complying with the enforced JSON Schema (arrays present even if empty).
-- No commentary, no markdown, no extra keys.
+RETURN:
+- A single JSON object that conforms to the provided JSON Schema (arrays present even if empty).
 """.strip()

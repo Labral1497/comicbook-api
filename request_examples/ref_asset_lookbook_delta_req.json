@@ -1,24 +1,11 @@
 {
   "job_id": "cebdc73f3afb4e9d8dcdaa6f29ae04ea",
   "ids": [
-    "char_fruit_vendor",
-    "loc_market",
-    "prop_inflatable_fruit",
-    "prop_race_banner"
+    "loc_sky_over_dubai"
   ],
   "asset_types": {
-    "char_fruit_vendor": [
-      "portrait",
-      "turnaround"
-    ],
-    "loc_market": [
+    "loc_sky_over_dubai": [
       "wide"
-    ],
-    "prop_inflatable_fruit": [
-      "detail"
-    ],
-    "prop_race_banner": [
-      "detail"
     ]
   },
   "force": false,
