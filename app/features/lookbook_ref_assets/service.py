@@ -386,7 +386,7 @@ def generate_ref_assets(req: GenerateRefAssetsRequest) -> GenerateRefAssetsRespo
                 assets_list[:] = [a for a in assets_list if a.type != t]
                 ref = ReferenceAsset(
                     type=t,
-                    url=info.get("signed_url") or info.get("public_url") or info.get("gcs_url"),
+                    url=info.get("public_url") or info.get("gcs_url") or info.get("signed_url"),
                     gs_uri=info.get("gs_uri"),
                 )
                 assets_list.append(ref)

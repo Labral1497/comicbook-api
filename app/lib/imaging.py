@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import HTTPException
 from app.config import config
 from app import logger
-from app.lib.gcs_inventory import _DATAURL_RE
+from app.lib.gcs_inventory import _DATAURL_RE, download_gcs_object_to_file
 from app.lib.openai_client import client as _client
 
 log = logger.get_logger(__name__)
@@ -154,3 +154,57 @@ def maybe_decode_image_to_path(image_base64: str | None, workdir: str) -> str | 
         with open(ref_path, "wb") as f:
             f.write(data)
     return ref_path
+
+_DATA_URL_RE = re.compile(r"^data:image/[\w+.-]+;base64,(?P<b64>.+)$", re.IGNORECASE | re.DOTALL)
+
+def resolve_cover_ref_b64_or_gcs(
+    image_b64: Optional[str],
+    *,
+    job_id: str,
+    workdir: str,
+    bucket: Optional[str] = None,
+) -> Optional[str]:
+    """
+    1) If `image_b64` is provided, decode (supports raw b64 or data URL) -> save -> return path.
+    2) Else (or if decode fails), fetch gs://{bucket}/jobs/{job_id}/cove.png -> save -> return path.
+    Returns None if neither path succeeds.
+    """
+    os.makedirs(workdir, exist_ok=True)
+
+    # ---------- Try base64 from request ----------
+    if image_b64:
+        try:
+            m = _DATA_URL_RE.match(image_b64.strip())
+            b64 = m.group("b64") if m else image_b64.strip()
+            # Normalize whitespace and padding
+            b64 = "".join(b64.split())
+            missing_padding = (-len(b64)) % 4
+            if missing_padding:
+                b64 += "=" * missing_padding
+
+            raw = base64.b64decode(b64, validate=False)
+            if raw:
+                out = os.path.join(workdir, f"cover_ref_{uuid.uuid4().hex}.png")
+                with open(out, "wb") as f:
+                    f.write(raw)
+                return out
+        except Exception as e:
+            log.warning("Failed to decode cover image base64; will try GCS fallback: %s", e)
+
+    # ---------- Fallback: GCS jobs/{job_id}/cove.png ----------
+    bucket = bucket or getattr(config, "gcs_bucket", None)
+    if not bucket:
+        log.error("No GCS bucket configured (config.gcs_bucket missing) and no bucket argument provided.")
+        return None
+
+    gs_uri = f"gs://{bucket}/jobs/{job_id}/cover.png"
+    out = os.path.join(workdir, f"cover_ref_{uuid.uuid4().hex}.png")
+    try:
+        download_gcs_object_to_file(gs_uri, out)
+        if os.path.exists(out) and os.path.getsize(out) > 0:
+            return out
+        log.error("Downloaded 0 bytes from %s", gs_uri)
+    except Exception as e:
+        log.error("Failed to download %s: %s", gs_uri, e)
+
+    return None

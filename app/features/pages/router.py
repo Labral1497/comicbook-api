@@ -10,6 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.config import config
+from app.features.full_script.schemas import Page
 from app.logger import get_logger
 from app.features.pages.schemas import ComicRequest
 from app.lib.paths import ensure_job_dir, make_job_dir_with_id, job_dir
@@ -24,7 +25,7 @@ from app.lib.jobs import (
     set_task_name,
 )
 from app.lib.cloud_tasks import create_task, delete_task
-from app.lib.imaging import resolve_or_download_cover_ref
+from app.lib.imaging import resolve_cover_ref_b64_or_gcs, resolve_or_download_cover_ref
 from app.lib.gcs_inventory import download_gcs_object_to_file, upload_json_to_gcs, upload_to_gcs
 from app.lib.pdf import make_pdf
 from app.features.pages.service import render_pages_chained
@@ -60,7 +61,7 @@ async def enqueue_comic_job(req: ComicRequest) -> dict:
     if mf.get("cancelled"):
         log.info(f"[{job_id}] already cancelled; acking")
         return JSONResponse({"job_id": job_id, "ok": True, "cancelled": True})
-    seed_manifest_pending(mf_path, total_pages=len(req.pages))
+    seed_manifest_pending(mf_path, total_pages=len(req.pages or []))
 
     # upload request.json to GCS (source of truth for worker)
     req_info = upload_json_to_gcs(
@@ -128,8 +129,24 @@ async def worker_process(job_id: str, request: Request) -> JSONResponse:
         req_dict = json.load(f)
     req = ComicRequest(**req_dict)
 
+    pages = _resolve_pages_or_fail(
+        job_id=job_id,
+        workdir=workdir,
+        req_dict=req_dict,
+        request_gcs_uri=request_gcs,
+    )
+
+    req_dict["pages"] = [p.model_dump() for p in pages]
+    req = ComicRequest(**req_dict)
+
+    # ✅ reseed manifest with the accurate page count if needed
+    mf = load_manifest(mf_path)
+    current_count = len(mf.get("pages", [])) if isinstance(mf.get("pages"), list) else len(mf.get("pending", [])) if isinstance(mf.get("pending"), list) else 0
+    if current_count != len(pages):
+        seed_manifest_pending(mf_path, total_pages=len(pages))
+
     # resolve cover image
-    cover_ref_path = resolve_or_download_cover_ref(req.image_ref, workdir)
+    cover_ref_path = resolve_cover_ref_b64_or_gcs(req.image_ref, job_id=req.job_id, workdir=workdir)
     if not cover_ref_path or not os.path.exists(cover_ref_path):
         raise HTTPException(200, "Invalid or missing cover image reference")
 
@@ -216,3 +233,55 @@ async def stop_comic_job(job_id: str) -> dict:
     save_manifest(mf_path, mf)
 
     return {"job_id": job_id, "cancelled": True, "queued_task_deleted": deleted}
+
+def _resolve_pages_or_fail(
+    *,
+    job_id: str,
+    workdir: str,
+    req_dict: dict,
+    request_gcs_uri: Optional[str],
+) -> List[Page]:
+    """
+    Priority:
+      1) Inline request.pages
+      2) req.script_gcs_uri
+      3) request_gcs_uri with 'request.json' -> 'script.json'
+      4) local {workdir}/script.json (if already present)
+    """
+    # 1) inline
+    if req_dict.get("pages"):
+        return [Page(**p) for p in req_dict["pages"]]
+
+    # candidate URIs
+    candidates: List[str] = []
+    if req_dict.get("script_gcs_uri"):
+        candidates.append(req_dict["script_gcs_uri"])
+    if request_gcs_uri and request_gcs_uri.endswith("request.json"):
+        candidates.append(request_gcs_uri.replace("request.json", "script.json"))
+
+    local_path = os.path.join(workdir, "script.json")
+
+    # 4) local file if already there
+    if os.path.exists(local_path):
+        with open(local_path, "r") as f:
+            data = json.load(f)
+        pages = [Page(**p) for p in data.get("pages", [])]
+        if pages:
+            return pages
+
+    # 2/3) download first working candidate
+    for uri in candidates:
+        try:
+            download_gcs_object_to_file(uri, local_path)
+            with open(local_path, "r") as f:
+                data = json.load(f)
+            pages = [Page(**p) for p in data.get("pages", [])]
+            if pages:
+                return pages
+        except Exception as e:
+            log.warning(f"failed to fetch/parse script from {uri}: {e}")
+
+    raise HTTPException(
+        status_code=400,
+        detail="Could not resolve script pages. Provide 'pages' inline, or 'script_gcs_uri', or ensure jobs/{job_id}/script.json exists."
+    )
